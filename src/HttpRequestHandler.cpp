@@ -7,17 +7,35 @@
  * @copyright Copyright (c) 2022-2024 Marc S. Ressl
  */
 
+#include "HttpRequestHandler.h"
+
+#include <chrono>
 #include <filesystem>
 #include <fstream>
 #include <iostream>
 
-#include "HttpRequestHandler.h"
-
 using namespace std;
 
-HttpRequestHandler::HttpRequestHandler(string homePath)
-{
+HttpRequestHandler::HttpRequestHandler(string homePath) {
     this->homePath = homePath;
+
+    // Opens database
+    if (sqlite3_open("index.db", &database) != SQLITE_OK) {
+        cerr << "Error opening database: " << sqlite3_errmsg(database) << endl;
+        database = nullptr;
+    } else {
+        cout << "Database open success" << endl;
+    }
+}
+
+/**
+ * @brief Destroys Handler once no longer used
+ */
+HttpRequestHandler::~HttpRequestHandler() {
+    if (database) {
+        sqlite3_close(database);
+        cout << "Database closed" << endl;
+    }
 }
 
 /**
@@ -28,8 +46,7 @@ HttpRequestHandler::HttpRequestHandler(string homePath)
  * @return true URL valid
  * @return false URL invalid
  */
-bool HttpRequestHandler::serve(string url, vector<char> &response)
-{
+bool HttpRequestHandler::serve(string url, vector<char>& response) {
     // Blocks directory traversal
     // e.g. https://www.example.com/show_file.php?file=../../MyFile
     // * Builds absolute local path from url
@@ -57,18 +74,17 @@ bool HttpRequestHandler::serve(string url, vector<char> &response)
 }
 
 bool HttpRequestHandler::handleRequest(string url,
-                                               HttpArguments arguments,
-                                               vector<char> &response)
-{
+                                       HttpArguments arguments,
+                                       vector<char>& response) {
     string searchPage = "/search";
-    if (url.substr(0, searchPage.size()) == searchPage)
-    {
+    if (url.substr(0, searchPage.size()) == searchPage) {
         string searchString;
         if (arguments.find("q") != arguments.end())
             searchString = arguments["q"];
 
         // Header
-        string responseString = string("<!DOCTYPE html>\
+        string responseString = string(
+            "<!DOCTYPE html>\
 <html>\
 \
 <head>\
@@ -87,32 +103,64 @@ bool HttpRequestHandler::handleRequest(string url,
         <div class=\"search\">\
             <form action=\"/search\" method=\"get\">\
                 <input type=\"text\" name=\"q\" value=\"" +
-                                       searchString + "\" autofocus>\
+            searchString +
+            "\" autofocus>\
             </form>\
         </div>\
         ");
 
         // YOUR JOB: fill in results
-        float searchTime = 0.1F;
+
+        // Starts timer
+        auto startTime = chrono::high_resolution_clock::now();
+
+        float searchTime = 0.0F;
         vector<string> results;
 
+        if (!searchString.empty() && database) {
+            // Pointer for read statement
+            sqlite3_stmt* stmt;
+            // Statement structure
+            const char* sql =
+                "SELECT path FROM webpage_index WHERE webpage_index MATCH ? LIMIT 100;";
+
+            // Compiles SQL statement
+            if (sqlite3_prepare_v2(database, sql, -1, &stmt, NULL) == SQLITE_OK) {
+                sqlite3_bind_text(stmt, 1, searchString.c_str(), -1, SQLITE_TRANSIENT);
+
+                // Iterates through results
+                while (sqlite3_step(stmt) == SQLITE_ROW) {
+                    const char* path = (const char*)sqlite3_column_text(stmt, 0);
+                    if (path) {
+                        results.push_back(string(path));
+                    }
+                }
+
+                sqlite3_finalize(stmt);
+            }
+        }
+
+        // Stops timer
+        auto endTime = chrono::high_resolution_clock::now();
+        searchTime = chrono::duration<float>(endTime - startTime).count();
+
         // Print search results
-        responseString += "<div class=\"results\">" + to_string(results.size()) +
-                          " results (" + to_string(searchTime) + " seconds):</div>";
-        for (auto &result : results)
-            responseString += "<div class=\"result\"><a href=\"" +
-                              result + "\">" + result + "</a></div>";
+        responseString += "<div class=\"results\">" + to_string(results.size()) + " results (" +
+                          to_string(searchTime) + " seconds):</div>";
+        for (auto& result : results)
+            responseString +=
+                "<div class=\"result\"><a href=\"" + result + "\">" + result + "</a></div>";
 
         // Trailer
-        responseString += "    </article>\
+        responseString +=
+            "    </article>\
 </body>\
 </html>";
 
         response.assign(responseString.begin(), responseString.end());
 
         return true;
-    }
-    else
+    } else
         return serve(url, response);
 
     return false;

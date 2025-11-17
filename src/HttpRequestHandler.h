@@ -11,11 +11,13 @@
 #define HTTPREQUESTHANDLER_H
 
 #include "HttpServer.h"
+#include <sqlite3.h>
 
 class HttpRequestHandler
 {
 public:
     HttpRequestHandler(std::string homePath);
+    ~HttpRequestHandler();
 
     bool handleRequest(std::string url, HttpArguments arguments, std::vector<char> &response);
 
@@ -23,6 +25,7 @@ private:
     bool serve(std::string path, std::vector<char> &response);
 
     std::string homePath;
+    sqlite3 *database;
 };
 
 #endif
