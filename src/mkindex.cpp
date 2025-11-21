@@ -73,7 +73,7 @@ string removeHTMLTags(const string& html) {
     }
 
     // Reduces line breaks and multiple spaces
-    for (char c : result) {
+    for (unsigned char c : result) {
         if (isspace(c)) {
             if (!lastWasSpace) {
                 normalized += ' ';
