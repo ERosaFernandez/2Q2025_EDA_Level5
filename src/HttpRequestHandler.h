@@ -16,7 +16,7 @@
 class HttpRequestHandler
 {
 public:
-    HttpRequestHandler(std::string homePath);
+    HttpRequestHandler(std::string homePath, bool imagemode = 0);
     ~HttpRequestHandler();
 
     bool handleRequest(std::string url, HttpArguments arguments, std::vector<char> &response);
@@ -26,6 +26,8 @@ private:
 
     std::string homePath;
     sqlite3 *database;
+    bool imagemode;
+    const char* tableName;
 };
 
 #endif

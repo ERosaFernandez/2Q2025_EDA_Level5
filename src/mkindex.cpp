@@ -92,14 +92,24 @@ int main(int argc, const char* argv[]) {
     CommandLineParser parser(argc, argv);
 
     // Parse command line
-    if (!parser.hasOption("-w")) {
-        cout << "error: webpage folder route must be specified!" << endl
-             << "example: ./mkindex -w ../www/" << endl;
+    bool htmlMode = parser.hasOption("-w");
+    bool imageMode = parser.hasOption("-s");
 
+	//Toggles between HTML mode and Image mode
+    if (!htmlMode && !imageMode) {
+        cout << "error: input folder must be specified!" << endl
+             << "HTML mode: ./mkindex -w ../www/" << endl
+             << "Image mode: ./mkindex -s ../special/" << endl;
         return 1;
     }
-    string webpageFolder = parser.getOption("-w");
-    const char* databaseFile = "index.db";
+
+    if (htmlMode && imageMode) {
+        cout << "error: cannot use -w and -s at the same time!" << endl;
+        return 1;
+    }
+
+    string inputFolder = htmlMode ? parser.getOption("-w") : parser.getOption("-s");
+    const char* databaseFile = htmlMode? "index.db": "images.db";
     sqlite3* database;
     char* databaseErrorMessage;
 
@@ -111,13 +121,20 @@ int main(int argc, const char* argv[]) {
         return 1;
     }
 
-    // Create a FTS5 virtual table
-    cout << "Creating FTS5 virtual table..." << endl;
+
+
+    // Create FTS5 virtual table
+    const char* tableName = imageMode ? "images_index" : "webpage_index";
+    cout << "Creating FTS5 virtual table: " << tableName << "..." << endl;
+
+    string createTableSQL = string("CREATE VIRTUAL TABLE IF NOT EXISTS ") + tableName +
+                            " USING fts5("
+                            "path UNINDEXED,"
+                            "title,"
+                            "content);";
+
     if (sqlite3_exec(database,
-                     "CREATE VIRTUAL TABLE IF NOT EXISTS webpage_index USING fts5("
-                     "path UNINDEXED,"
-                     "title,"
-                     "content);",
+                     createTableSQL.c_str(),
                      NULL,
                      0,
                      &databaseErrorMessage) != SQLITE_OK) {
@@ -128,7 +145,8 @@ int main(int argc, const char* argv[]) {
 
     // Delete previous entries if table already existed
     cout << "Deleting previous entries..." << endl;
-    if (sqlite3_exec(database, "DELETE FROM webpage_index;", NULL, 0, &databaseErrorMessage) !=
+    string deleteSQL = string("DELETE FROM ") + tableName + ";";
+    if (sqlite3_exec(database, deleteSQL.c_str(), NULL, 0, &databaseErrorMessage) !=
         SQLITE_OK) {
         cout << "Error: " << sqlite3_errmsg(database) << endl;
         sqlite3_close(database);
@@ -142,66 +160,113 @@ int main(int argc, const char* argv[]) {
     // Prepare SQL statement
     cout << "Preparing SQL statement..." << endl;
     sqlite3_stmt* stmt;
-    const char* sql = "INSERT INTO webpage_index (path, title, content) VALUES (?, ?, ?);";
+    string insertSQL =
+        string("INSERT INTO ") + tableName + " (path, title, content) VALUES (?, ?, ?);";
+    //const char* sql = "INSERT INTO webpage_index (path, title, content) VALUES (?, ?, ?);";
 
-    if (sqlite3_prepare_v2(database, sql, -1, &stmt, NULL) != SQLITE_OK) {
+    if (sqlite3_prepare_v2(database, insertSQL.c_str(), -1, &stmt, NULL) != SQLITE_OK) {
         cout << "Error preparing statement: " << sqlite3_errmsg(database) << endl;
         sqlite3_close(database);
         return 1;
     }
 
-    // Iterate through HTML files in the specified folder
-    cout << "Indexing HTML files from folder: " << webpageFolder << endl;
+    // Iterate through files in the specified folder
+    const char* fileType = imageMode ? "image" : "HTML";
+    cout << "Indexing " << fileType << " files from folder: " << inputFolder << endl;
+
     int processedFiles = 0;
 
-    for (const auto& entry : filesystem::recursive_directory_iterator(webpageFolder)) {
-        // Only process .html files
-        if (entry.is_regular_file() && entry.path().extension() == ".html") {
+	if (htmlMode){
+        for (const auto& entry : filesystem::recursive_directory_iterator(inputFolder)) {
+            // Only process .html files
+            if (entry.is_regular_file() && entry.path().extension() == ".html") {
+                cout << "Processing: " << entry.path().filename().string() << endl;
+
+                // Reads file content
+                ifstream fileStream(entry.path());
+                if (fileStream.fail()) {
+                    cout << "  Error opening file, skipping..." << endl;
+                    continue;
+                }
+
+                string htmlContent((istreambuf_iterator<char>(fileStream)),
+                                   istreambuf_iterator<char>());
+                fileStream.close();
+
+                // Exrtact title
+                string title = "No Title";
+                size_t titleStart = htmlContent.find("<title>");
+                size_t titleEnd = htmlContent.find("</title>");
+
+                if (titleStart != string::npos && titleEnd != string::npos &&
+                    titleEnd > titleStart) {
+                    title = htmlContent.substr(titleStart + 7, titleEnd - (titleStart + 7));
+                }
+
+                // Parse HTML content to plain text
+                string cleanContent = removeHTMLTags(htmlContent);  // ← Función que implementarás
+
+                // Sets relative path
+                string relativePath = "/wiki/" + entry.path().filename().string();
+
+                // Bind values to the prepared statement
+                sqlite3_bind_text(stmt, 1, relativePath.c_str(), -1, SQLITE_TRANSIENT);
+                sqlite3_bind_text(stmt, 2, title.c_str(), -1, SQLITE_TRANSIENT);
+                sqlite3_bind_text(stmt, 3, cleanContent.c_str(), -1, SQLITE_TRANSIENT);
+
+                // Executes statement
+                if (sqlite3_step(stmt) != SQLITE_DONE) {
+                    cout << "  Error inserting: " << sqlite3_errmsg(database) << endl;
+                }
+
+                // Resets for next iteration
+                sqlite3_reset(stmt);
+                sqlite3_clear_bindings(stmt);
+
+                processedFiles++;
+            }
+        }
+    }
+	else {
+        for (const auto& entry : filesystem::recursive_directory_iterator(inputFolder)) {
+            if (!entry.is_regular_file())
+                continue;
+
+            string extension = entry.path().extension().string();
+
+            // Filters only image files
+            if (extension != ".png" && extension != ".jpg" && extension != ".jpeg" &&
+                extension != ".PNG" && extension != ".JPG" && extension != ".JPEG")
+                continue;
+
             cout << "Processing: " << entry.path().filename().string() << endl;
 
-            // Reads file content
-            ifstream fileStream(entry.path());
-            if (fileStream.fail()) {
-                cout << "  Error opening file, skipping..." << endl;
-                continue;
-            }
-
-            string htmlContent((istreambuf_iterator<char>(fileStream)),
-                               istreambuf_iterator<char>());
-            fileStream.close();
-
-            // Exrtact title
-            string title = "No Title";
-            size_t titleStart = htmlContent.find("<title>");
-            size_t titleEnd = htmlContent.find("</title>");
-
-            if (titleStart != string::npos && titleEnd != string::npos && titleEnd > titleStart) {
-                title = htmlContent.substr(titleStart + 7, titleEnd - (titleStart + 7));
-            }
-
-            // Parse HTML content to plain text
-            string cleanContent = removeHTMLTags(htmlContent);  // ← Función que implementarás
+            // Removes the extension, uses filename as title and content
+            string filename = entry.path().stem().string();
+            string title = filename;
+            string cleanContent = filename;
 
             // Sets relative path
-            string relativePath = "/wiki/" + entry.path().filename().string();
+            string relativePath = "/special/" + entry.path().filename().string();
 
             // Bind values to the prepared statement
             sqlite3_bind_text(stmt, 1, relativePath.c_str(), -1, SQLITE_TRANSIENT);
             sqlite3_bind_text(stmt, 2, title.c_str(), -1, SQLITE_TRANSIENT);
             sqlite3_bind_text(stmt, 3, cleanContent.c_str(), -1, SQLITE_TRANSIENT);
 
-            // Executes statement
+			// Executes statement
             if (sqlite3_step(stmt) != SQLITE_DONE) {
                 cout << "  Error inserting: " << sqlite3_errmsg(database) << endl;
             }
 
-            // Resets for next iteration
+			// Resets for next iteration
             sqlite3_reset(stmt);
             sqlite3_clear_bindings(stmt);
 
             processedFiles++;
         }
     }
+
 
     // Clears statement
     sqlite3_finalize(stmt);

@@ -16,15 +16,20 @@
 
 using namespace std;
 
-HttpRequestHandler::HttpRequestHandler(string homePath) {
+HttpRequestHandler::HttpRequestHandler(string homePath, bool imageMode) {
     this->homePath = homePath;
 
+    // Sets up database location and table name
+    const char* dbFile = imageMode ? "images.db" : "index.db";
+    this->tableName = imageMode ? "images_index" : "webpage_index";
+
     // Opens database
-    if (sqlite3_open("index.db", &database) != SQLITE_OK) {
-        cerr << "Error opening database: " << sqlite3_errmsg(database) << endl;
+    if (sqlite3_open(dbFile, &database) != SQLITE_OK) {
+        cerr << "Error opening database (" << dbFile << "): " << sqlite3_errmsg(database) << endl;
         database = nullptr;
     } else {
-        cout << "Database open success" << endl;
+        cout << "Database opened successfully: " << dbFile << endl;
+        cout << "Search mode: " << (imageMode ? "IMAGES" : "HTML") << endl;
     }
 }
 
@@ -121,11 +126,11 @@ bool HttpRequestHandler::handleRequest(string url,
             // Pointer for read statement
             sqlite3_stmt* stmt;
             // Statement structure
-            const char* sql =
-                "SELECT path FROM webpage_index WHERE webpage_index MATCH ? LIMIT 100;";
+            string sql = string("SELECT path FROM ") + tableName + " WHERE " + tableName +
+                         " MATCH ? LIMIT 100;";
 
             // Compiles SQL statement
-            if (sqlite3_prepare_v2(database, sql, -1, &stmt, NULL) == SQLITE_OK) {
+            if (sqlite3_prepare_v2(database, sql.c_str(), -1, &stmt, NULL) == SQLITE_OK) {
                 sqlite3_bind_text(stmt, 1, searchString.c_str(), -1, SQLITE_TRANSIENT);
 
                 // Iterates through results
@@ -145,11 +150,22 @@ bool HttpRequestHandler::handleRequest(string url,
         searchTime = chrono::duration<float>(endTime - startTime).count();
 
         // Print search results
-        responseString += "<div class=\"results\">" + to_string(results.size()) + " results (" +
-                          to_string(searchTime) + " seconds):</div>";
-        for (auto& result : results)
+
+        for (auto& result : results) {
+            // Extracts display name from path
+            size_t lastSlash = result.find_last_of('/');
+            string displayName =
+                (lastSlash != string::npos) ? result.substr(lastSlash + 1) : result;
+
+            // Removes extension
+            size_t lastDot = displayName.find_last_of('.');
+            if (lastDot != string::npos) {
+                displayName = displayName.substr(0, lastDot);
+            }
+
             responseString +=
-                "<div class=\"result\"><a href=\"" + result + "\">" + result + "</a></div>";
+                "<div class=\"result\"><a href=\"" + result + "\">" + displayName + "</a></div>";
+        }
 
         // Trailer
         responseString +=
