@@ -10,24 +10,24 @@
 #ifndef HTTPREQUESTHANDLER_H
 #define HTTPREQUESTHANDLER_H
 
-#include "HttpServer.h"
-#include "trie.h"
 #include <sqlite3.h>
 
-class HttpRequestHandler
-{
-public:
+#include "HttpServer.h"
+#include "trie.h"
+
+class HttpRequestHandler {
+  public:
     HttpRequestHandler(std::string homePath, bool imagemode = 0);
     ~HttpRequestHandler();
 
-    bool handleRequest(std::string url, HttpArguments arguments, std::vector<char> &response);
+    bool handleRequest(std::string url, HttpArguments arguments, std::vector<char>& response);
 
-private:
-    bool serve(std::string path, std::vector<char> &response);
+  private:
+    bool serve(std::string path, std::vector<char>& response);
     bool loadVocabularyIntoTrie();
 
     std::string homePath;
-    sqlite3 *database;
+    sqlite3* database;
     bool imagemode;
     const char* tableName;
     Trie* trie;

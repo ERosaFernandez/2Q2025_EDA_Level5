@@ -1,0 +1,209 @@
+/* ======================================
+   ESTILOS GENERALES
+   ====================================== */
+
+html {
+    line-height: 1.5;
+}
+
+body {
+    margin: 0;
+    padding: 0;
+    font-family: Inter, system-ui, -apple-system, Segoe UI, Roboto, Helvetica, Arial, sans-serif;
+    color: #202124;
+    background: #fff;
+}
+
+article {
+    width: 100%;
+}
+
+
+/* ======================================
+   PORTADA — Buscador estilo Google
+   ====================================== */
+
+article.edaoogle {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    margin-top: 12vh;
+}
+
+/* Título estilo Google - SIN SUBRAYADO */
+article.edaoogle .title {
+    margin: 0 0 4vh 0;
+    font-size: 5rem;
+    text-align: center;
+    font-weight: 600;
+    user-select: none;
+    color: #4285f4;
+    text-decoration: none !important;
+}
+
+/* Barra de búsqueda */
+article.edaoogle .search {
+    margin-bottom: 3rem;
+}
+
+article.edaoogle .search form {
+    display: flex;
+    align-items: center;
+    gap: 0.75rem;
+}
+
+article.edaoogle .search input[type="text"] {
+    width: min(90vw, 500px);
+    padding: 0.9rem 1.2rem;
+    font-size: 1.1rem;
+    border: 1px solid #dfe1e5;
+    border-radius: 24px;
+    outline: none;
+    background: #fff;
+    color: #000;
+    box-shadow: 0 1px 6px rgba(32, 33, 36, 0.28);
+    transition: box-shadow 0.2s ease;
+}
+
+article.edaoogle .search input[type="text"]:focus {
+    box-shadow: 0 1px 8px rgba(32, 33, 36, 0.35);
+}
+
+/* Botón de buscar */
+article.edaoogle .search .search-btn {
+    padding: 0.75rem 1.5rem;
+    font-size: 1rem;
+    font-family: inherit;
+    background-color: #f8f9fa;
+    border: 1px solid #f8f9fa;
+    border-radius: 4px;
+    color: #3c4043;
+    cursor: pointer;
+    transition: all 0.2s ease;
+}
+
+article.edaoogle .search .search-btn:hover {
+    box-shadow: 0 1px 1px rgba(0,0,0,0.1);
+    background-color: #f8f9fa;
+    border: 1px solid #dadce0;
+}
+
+
+/* ======================================
+   RESULTADOS — estilo Google Search
+   ====================================== */
+
+.results {
+    width: 700px;
+    max-width: 90vw;
+    margin: 2rem auto 4rem auto;
+    text-align: left;
+    font-family: Inter, Arial, sans-serif;
+    /* Alineación con la barra de búsqueda */
+    margin-left: calc(50% - 350px);
+}
+
+/* Versión con barra de búsqueda visible (página de resultados) */
+article.edaoogle.results-page {
+    margin-top: 2vh;
+    align-items: flex-start;
+    padding-left: calc(50% - 350px);
+}
+
+article.edaoogle.results-page .title {
+    font-size: 2.5rem;
+    margin-bottom: 2vh;
+}
+
+article.edaoogle.results-page .search input[type="text"] {
+    width: min(90vw, 450px);
+}
+
+.result {
+    margin-bottom: 2rem;
+}
+
+/* URL verde */
+.result .url {
+    font-size: 0.9rem;
+    color: #006621;
+    margin-bottom: 0.2rem;
+    word-break: break-all;
+}
+
+/* Título (no subrayado excepto hover) */
+.result .title {
+    display: inline-block;
+    font-size: 1.25rem;
+    color: #1a0dab;
+    text-decoration: none !important;
+    margin-bottom: 0.2rem;
+}
+
+.result .title:visited,
+.result .title:focus,
+.result .title:active {
+    text-decoration: none !important;
+}
+
+.result .title:hover {
+    text-decoration: underline;
+}
+
+/* Snippet */
+.result .snippet {
+    font-size: 0.95rem;
+    color: #4d5156;
+}
+
+
+/* ======================================
+   ESTILOS DE WIKIPEDIA (por compatibilidad)
+   ====================================== */
+
+#siteSub, .mw-jump-link, .printfooter, .catlinks {
+    display: none;
+}
+
+h1.firstHeading {
+    color: #313233;
+}
+
+#contentSub2 a:hover {
+    opacity: .75;
+}
+
+.infobox,
+.tright,
+.tleft {
+    margin: 1em 0 1em 1.5em;
+    padding: 0.5em;
+    clear: right;
+    float: right;
+    font-size: 75%;
+    background-color: rgba(0, 0, 0, 0.03);
+}
+
+.tleft {
+    margin: 0 1.5em 1em 0;
+    clear: left;
+    float: left;
+    font-size: 80%;
+}
+
+.wikitable,
+.mw-authority-control {
+    background-color: rgba(0, 0, 0, 0.03);
+}
+
+table, tr, td, th {
+    border-color: rgba(0, 0, 0, 0.1);
+}
+
+td, th {
+    padding: 0.5em;
+}
+
+hr {
+    border-color: rgba(0, 0, 0, 0.1);
+}

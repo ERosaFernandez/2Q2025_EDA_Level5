@@ -59,7 +59,7 @@ bool HttpRequestHandler::loadVocabularyIntoTrie() {
         cerr << "Failed to prepare statement: " << sqlite3_errmsg(database) << endl;
         return false;
     }
-    
+
     sqlite3_finalize(stmt);
     return true;
 }

@@ -5,4 +5,7 @@ Ejecución en linux:
 ./mkindex -w ../www/
 ./mkindex -s ../www/special/
 
+Ejecución en Windows:
+./edahttpd.exe -h ../../../../www/
+
 En el modo IMAGE, los títulos están normalizados (todas mínusculas, carácteres ASCII)
