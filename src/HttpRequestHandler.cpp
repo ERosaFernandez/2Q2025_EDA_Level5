@@ -13,6 +13,7 @@
 #include <filesystem>
 #include <fstream>
 #include <iostream>
+#include <istream>
 
 using namespace std;
 
@@ -31,6 +32,36 @@ HttpRequestHandler::HttpRequestHandler(string homePath, bool imageMode) {
         cout << "Database opened successfully: " << dbFile << endl;
         cout << "Search mode: " << (imageMode ? "IMAGES" : "HTML") << endl;
     }
+
+    // Loads vocabulary into Trie
+    cout << "Loading vocabulary into Trie..." << endl;
+    trie = new Trie();
+    if(loadVocabularyIntoTrie()) {
+        cout << "Vocabulary loaded successfully." << endl;
+    } else {
+        cout << "Failed to load vocabulary." << endl;
+    }
+
+}
+
+bool HttpRequestHandler::loadVocabularyIntoTrie() {
+    if (!database) {
+        return false;
+    }
+
+    // Pointer for read statement
+    sqlite3_stmt* stmt;
+    // Statement structure
+    string sql = string("SELECT content FROM ") + tableName + "_index;";
+
+    // Compiles SQL statement
+    if (sqlite3_prepare_v2(database, sql.c_str(), -1, &stmt, NULL) != SQLITE_OK) {
+        cerr << "Failed to prepare statement: " << sqlite3_errmsg(database) << endl;
+        return false;
+    }
+    
+    sqlite3_finalize(stmt);
+    return true;
 }
 
 /**
@@ -41,6 +72,9 @@ HttpRequestHandler::~HttpRequestHandler() {
         sqlite3_close(database);
         cout << "Database closed" << endl;
     }
+
+    delete trie;
+    cout << "Trie deleted" << endl;
 }
 
 /**

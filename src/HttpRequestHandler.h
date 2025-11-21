@@ -11,6 +11,7 @@
 #define HTTPREQUESTHANDLER_H
 
 #include "HttpServer.h"
+#include "trie.h"
 #include <sqlite3.h>
 
 class HttpRequestHandler
@@ -23,11 +24,13 @@ public:
 
 private:
     bool serve(std::string path, std::vector<char> &response);
+    bool loadVocabularyIntoTrie();
 
     std::string homePath;
     sqlite3 *database;
     bool imagemode;
     const char* tableName;
+    Trie* trie;
 };
 
 #endif

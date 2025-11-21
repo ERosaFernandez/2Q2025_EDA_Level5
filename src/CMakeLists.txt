@@ -6,7 +6,7 @@ project(EDAoogle)
 set(CMAKE_CXX_STANDARD 17)
 
 # edahttpd
-add_executable(edahttpd edahttpd.cpp CommandLineParser.cpp HttpServer.cpp HttpRequestHandler.cpp)
+add_executable(edahttpd edahttpd.cpp CommandLineParser.cpp HttpServer.cpp HttpRequestHandler.cpp trie.cpp)
 
 find_path(MICROHTTPD_INCLUDE_PATHS NAMES microhttpd.h)
 find_library(MICROHTTPD_LIBRARIES NAMES microhttpd libmicrohttpd libmicrohttpd-dll)
