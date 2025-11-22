@@ -160,7 +160,7 @@ bool HttpRequestHandler::handleRequest(string url,
             query = arguments["q"];
 
         // Collect suggestions from Trie
-        size_t numSuggestions = trie->collectSuggestions(query, 5);
+        size_t numSuggestions = trie->collectSuggestions(query, 10);
 
         // Build response
         string jsonResponse = "[";
@@ -192,10 +192,41 @@ bool HttpRequestHandler::handleRequest(string url,
             searchString = arguments["q"];
 
         // Header
+
+        //=============== OLD HTML HEADER ===============//
+        // string responseString = string(
+        //             "<!DOCTYPE html>\
+// <html>\
+// \
+// <head>\
+//     <meta charset=\"utf-8\" />\
+//     <title>EDAoogle</title>\
+//     <link rel=\"preload\" href=\"https://fonts.googleapis.com\" />\
+//     <link rel=\"preload\" href=\"https://fonts.gstatic.com\" crossorigin />\
+//     <link
+        //     href=\"https://fonts.googleapis.com/css2?family=Inter:wght@400;800&display=swap\"
+        //     rel=\"stylesheet\" />\
+//     <link rel=\"preload\" href=\"../css/style.css\" />\
+//     <link rel=\"stylesheet\" href=\"../css/style.css\" />\
+// </head>\
+// \
+// <body>\
+//     <article class=\"edaoogle\">\
+//         <div class=\"title\"><a href=\"/\">EDAoogle</a></div>\
+//         <div class=\"search\">\
+//             <form action=\"/search\" method=\"get\">\
+//                 <input type=\"text\" name=\"q\" value=\"" +
+        //             searchString +
+        //             "\" autofocus>\
+//             </form>\
+//         </div>\
+//         ");
+
+        //=============== NEW HTML HEADER ===============//
+
         string responseString = string(
             "<!DOCTYPE html>\
 <html>\
-\
 <head>\
     <meta charset=\"utf-8\" />\
     <title>EDAoogle</title>\
@@ -204,6 +235,83 @@ bool HttpRequestHandler::handleRequest(string url,
     <link href=\"https://fonts.googleapis.com/css2?family=Inter:wght@400;800&display=swap\" rel=\"stylesheet\" />\
     <link rel=\"preload\" href=\"../css/style.css\" />\
     <link rel=\"stylesheet\" href=\"../css/style.css\" />\
+    <style>\
+        #suggestions {\
+            position: absolute;\
+            background: white;\
+            border: 1px solid #ddd;\
+            border-radius: 4px;\
+            max-height: 300px;\
+            overflow-y: auto;\
+            display: none;\
+            z-index: 1000;\
+            box-shadow: 0 2px 8px rgba(0,0,0,0.1);\
+        }\
+        .suggestion-item {\
+            padding: 10px 15px;\
+            cursor: pointer;\
+            border-bottom: 1px solid #f0f0f0;\
+        }\
+        .suggestion-item:hover {\
+            background-color: #f5f5f5;\
+        }\
+    </style>\
+    <script>\
+        document.addEventListener('DOMContentLoaded', () => {\
+            const input = document.querySelector('input[name=\"q\"]');\
+            const form = document.querySelector('form');\
+            let suggestionsDiv = document.createElement('div');\
+            suggestionsDiv.id = 'suggestions';\
+            input.parentNode.style.position = 'relative';\
+            input.parentNode.appendChild(suggestionsDiv);\
+            \
+            let debounceTimer;\
+            \
+            input.addEventListener('input', (e) => {\
+                clearTimeout(debounceTimer);\
+                \
+                const query = e.target.value.trim();\
+                \
+                if (query.length < 2) {\
+                    suggestionsDiv.style.display = 'none';\
+                    return;\
+                }\
+                \
+                debounceTimer = setTimeout(async () => {\
+                    try {\
+                        const response = await fetch('/predict?q=' + encodeURIComponent(query));\
+                        const suggestions = await response.json();\
+                        \
+                        if (suggestions.length > 0) {\
+                            suggestionsDiv.innerHTML = '';\
+                            suggestions.forEach(suggestion => {\
+                                const div = document.createElement('div');\
+                                div.className = 'suggestion-item';\
+                                div.textContent = suggestion;\
+                                div.onclick = () => {\
+                                    input.value = suggestion;\
+                                    suggestionsDiv.style.display = 'none';\
+                                    form.submit();\
+                                };\
+                                suggestionsDiv.appendChild(div);\
+                            });\
+                            suggestionsDiv.style.display = 'block';\
+                        } else {\
+                            suggestionsDiv.style.display = 'none';\
+                        }\
+                    } catch (error) {\
+                        console.error('Error fetching suggestions:', error);\
+                    }\
+                }, 300);\
+            });\
+            \
+            document.addEventListener('click', (e) => {\
+                if (e.target !== input) {\
+                    suggestionsDiv.style.display = 'none';\
+                }\
+            });\
+        });\
+    </script>\
 </head>\
 \
 <body>\
