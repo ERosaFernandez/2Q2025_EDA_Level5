@@ -1,5 +1,8 @@
 #include "trie.h"
 
+#include <unicode/uchar.h>
+#include <unicode/ustring.h>
+
 TrieNode* TrieNode::retrieveChild(char32_t c) {
     // Searches for child node
     auto it = children.find(c);
@@ -82,10 +85,11 @@ size_t Trie::collectSuggestions(const std::u32string& prefix, size_t maxSuggesti
     }
 
     TrieNode* currentNode = root;
-    std::u32string currentPrefix = prefix;
+    std::u32string currentPrefix;
 
     // Traverses to the end of the prefix
     for (char32_t c : prefix) {
+        currentPrefix.push_back(u_tolower(c));
         currentNode = currentNode->retrieveChild(c);
     }
 
@@ -116,7 +120,7 @@ void Trie::DFSCollector(TrieNode* node, std::u32string& currentWord, size_t& max
     // Traverse children
     for (auto& childIterator : node->children) {
         // Add character to current word and recurse
-        currentWord.push_back(childIterator.first);
+        currentWord.push_back(u_tolower(childIterator.first));
         DFSCollector(childIterator.second, currentWord, maxSuggestions);
         // Goes back one character
         currentWord.pop_back();

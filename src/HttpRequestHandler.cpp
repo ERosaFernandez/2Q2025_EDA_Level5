@@ -9,11 +9,15 @@
 
 #include "HttpRequestHandler.h"
 
+#include <unicode/uchar.h>
+#include <unicode/ustring.h>
+
 #include <chrono>
+#include <codecvt>
 #include <filesystem>
 #include <fstream>
 #include <iostream>
-#include <istream>
+#include <locale>
 
 using namespace std;
 
@@ -36,15 +40,15 @@ HttpRequestHandler::HttpRequestHandler(string homePath, bool imageMode) {
     // Loads vocabulary into Trie
     cout << "Loading vocabulary into Trie..." << endl;
     trie = new Trie();
-    if(loadVocabularyIntoTrie()) {
+    if (loadVocabularyIntoTrie()) {
         cout << "Vocabulary loaded successfully." << endl;
     } else {
         cout << "Failed to load vocabulary." << endl;
     }
-
 }
 
 bool HttpRequestHandler::loadVocabularyIntoTrie() {
+    // Checks if database is valid
     if (!database) {
         return false;
     }
@@ -52,7 +56,7 @@ bool HttpRequestHandler::loadVocabularyIntoTrie() {
     // Pointer for read statement
     sqlite3_stmt* stmt;
     // Statement structure
-    string sql = string("SELECT content FROM ") + tableName + "_index;";
+    string sql = string("SELECT content FROM ") + tableName;
 
     // Compiles SQL statement
     if (sqlite3_prepare_v2(database, sql.c_str(), -1, &stmt, NULL) != SQLITE_OK) {
@@ -60,7 +64,40 @@ bool HttpRequestHandler::loadVocabularyIntoTrie() {
         return false;
     }
 
+    wstring_convert<codecvt_utf8<char32_t>, char32_t> converter;
+    uint32_t pages = 0;
+    u32string content;
+    u32string word;
+    word.reserve(20);
+
+    while (sqlite3_step(stmt) == SQLITE_ROW) {
+        content.clear();
+        word.clear();
+        content = converter.from_bytes((char*)sqlite3_column_text(stmt, 0));
+
+        if (content.size() > 0) {
+            for (char32_t c : content) {
+                if (u_isalpha(c)) {
+                    // Builds word character by character
+                    word.push_back(u_tolower(c));
+                } else if (word.size() >= 3) {
+                    // Inserts word into Trie once a non-word character is found
+                    trie->insert(word);
+                    word.clear();
+                }
+            }
+            if (word.size() >= 3) {
+                // Inserts last word if applicable
+                trie->insert(word);
+                word.clear();
+            }
+            pages++;
+        }
+        cout << "Pages processed: " << pages << endl;
+    }
+
     sqlite3_finalize(stmt);
+    cout << "Total pages processed: " << pages << endl;
     return true;
 }
 
@@ -115,6 +152,39 @@ bool HttpRequestHandler::serve(string url, vector<char>& response) {
 bool HttpRequestHandler::handleRequest(string url,
                                        HttpArguments arguments,
                                        vector<char>& response) {
+    //=============== PREDICT HANDLER ===============//
+    string predictPage = "/predict";
+    if (url.substr(0, predictPage.size()) == predictPage) {
+        string query;
+        if (arguments.find("q") != arguments.end())
+            query = arguments["q"];
+
+        // Collect suggestions from Trie
+        size_t numSuggestions = trie->collectSuggestions(query, 5);
+
+        // Build response
+        string jsonResponse = "[";
+
+        // Converts suggestions to JSON array
+        wstring_convert<codecvt_utf8<char32_t>, char32_t> converter;
+
+        for (size_t i = 0; i < trie->collectWords.size(); i++) {
+            // Converts UTF-32 word back to UTF-8
+            string suggestion = converter.to_bytes(trie->collectWords[i]);
+
+            jsonResponse += "\"" + suggestion + "\"";
+
+            if (i < trie->collectWords.size() - 1) {
+                jsonResponse += ",";
+            }
+        }
+        jsonResponse += "]";
+
+        // Sets response
+        response.assign(jsonResponse.begin(), jsonResponse.end());
+        return true;
+    }
+    //=============== SEARCH HANDLER ===============//
     string searchPage = "/search";
     if (url.substr(0, searchPage.size()) == searchPage) {
         string searchString;
@@ -184,6 +254,9 @@ bool HttpRequestHandler::handleRequest(string url,
         searchTime = chrono::duration<float>(endTime - startTime).count();
 
         // Print search results
+
+        responseString += "<div class=\"results\">" + to_string(results.size()) + " results (" +
+                          to_string(searchTime) + " seconds):</div>";
 
         for (auto& result : results) {
             // Extracts display name from path
