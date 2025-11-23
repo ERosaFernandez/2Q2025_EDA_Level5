@@ -48,24 +48,32 @@ HttpRequestHandler::HttpRequestHandler(string homePath, bool imageMode) {
 }
 
 bool HttpRequestHandler::loadVocabularyIntoTrie() {
-    // Checks if database is valid
-    if (!database) {
-        return false;
-    }
-
+    this->vocabTableName = this->imagemode ? "images_vocab" : "webpage_vocab";
+    const char* vocabFile = this->imagemode ? "images_vocab.db" : "index_vocab.db";
     // Pointer for read statement
     sqlite3_stmt* stmt;
     // Statement structure
-    string sql = string("SELECT content FROM ") + tableName;
+    string sql = string("SELECT vocabulary FROM ") + vocabTableName;
+
+    // Opens database
+    if (sqlite3_open(vocabFile, &database_vocab) != SQLITE_OK) {
+        cerr << "Error opening Vocabulary (" << vocabFile << "): " << sqlite3_errmsg(database_vocab)
+             << endl;
+        database_vocab = nullptr;
+        return false;
+    } else {
+        cout << "Vocavulary opened successfully: " << vocabFile << endl;
+        cout << "Search mode: " << (this->imagemode ? "IMAGES" : "HTML") << endl;
+    }
 
     // Compiles SQL statement
-    if (sqlite3_prepare_v2(database, sql.c_str(), -1, &stmt, NULL) != SQLITE_OK) {
-        cerr << "Failed to prepare statement: " << sqlite3_errmsg(database) << endl;
+    if (sqlite3_prepare_v2(database_vocab, sql.c_str(), -1, &stmt, NULL) != SQLITE_OK) {
+        cerr << "Failed to prepare statement: " << sqlite3_errmsg(database_vocab) << endl;
         return false;
     }
 
     wstring_convert<codecvt_utf8<char32_t>, char32_t> converter;
-    uint32_t pages = 0;
+    uint32_t words = 0;
     u32string content;
     u32string word;
     word.reserve(20);
@@ -84,20 +92,23 @@ bool HttpRequestHandler::loadVocabularyIntoTrie() {
                     // Inserts word into Trie once a non-word character is found
                     trie->insert(word);
                     word.clear();
+                    words++;
+                    if (words % 1000 == 0) {
+                        cout << "Words inserted: " << words << endl;
+                    }
                 }
             }
-            if (word.size() >= 3) {
+            if (word.size() >= 5) {
                 // Inserts last word if applicable
                 trie->insert(word);
                 word.clear();
+                words++;
             }
-            pages++;
         }
-        cout << "Pages processed: " << pages << endl;
     }
 
     sqlite3_finalize(stmt);
-    cout << "Total pages processed: " << pages << endl;
+    cout << "Total words inserted: " << words << endl;
     return true;
 }
 

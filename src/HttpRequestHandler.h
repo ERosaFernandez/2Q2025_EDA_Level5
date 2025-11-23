@@ -28,8 +28,10 @@ class HttpRequestHandler {
 
     std::string homePath;
     sqlite3* database;
+    sqlite3* database_vocab;
     bool imagemode;
     const char* tableName;
+    const char* vocabTableName;
     Trie* trie;
 };
 

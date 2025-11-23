@@ -21,7 +21,8 @@ void printHelp() {
     cout << "Usage: edahttpd -h WWW_PATH [-p PORT] [-m MODE]" << endl;
     cout << "  -h WWW_PATH : Path to www folder" << endl;
     cout << "  -p PORT     : Server port (default: 8000)" << endl;
-    cout << "  -m MODE     : Search mode ('image' or 'images' for image search, default: HTML mode)" << endl;
+    cout << "  -m MODE     : Search mode ('image' or 'images' for image search, default: HTML mode)"
+         << endl;
 }
 
 int main(int argc, const char* argv[]) {
@@ -52,8 +53,8 @@ int main(int argc, const char* argv[]) {
         if (mode == "image" || mode == "images") {
             imageMode = true;
             cout << "Starting in IMAGE mode" << endl;
-        }
-        else cout << "Starting in HTML mode" << endl;
+        } else
+            cout << "Starting in HTML mode" << endl;
     }
 
     // Start server

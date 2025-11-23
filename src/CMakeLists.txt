@@ -16,6 +16,9 @@ target_link_libraries(edahttpd PRIVATE ${MICROHTTPD_LIBRARIES})
 find_package(unofficial-sqlite3 CONFIG REQUIRED)
 target_link_libraries(edahttpd PRIVATE unofficial::sqlite3::sqlite3)
 
+find_package(ICU REQUIRED COMPONENTS uc i18n)
+target_link_libraries(edahttpd PRIVATE ICU::uc ICU::i18n)
+
 # Windows: Copy libmicrohttpd.dll
 find_file(MICROHTTPD_BINARIES NAMES bin/libmicrohttpd-dll.dll)
 if(MICROHTTPD_BINARIES)
@@ -33,4 +36,5 @@ find_package(unofficial-sqlite3 CONFIG REQUIRED)
 target_link_libraries(mkindex PRIVATE unofficial::sqlite3::sqlite3)
 
 find_package(ICU REQUIRED COMPONENTS uc i18n)
-target_link_libraries(edahttpd PRIVATE ICU::uc ICU::i18n)
+target_link_libraries(mkindex PRIVATE ICU::uc ICU::i18n)
+
