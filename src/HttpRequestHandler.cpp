@@ -136,6 +136,7 @@ HttpRequestHandler::~HttpRequestHandler() {
     cout << "Trie deleted" << endl;
 }
 
+
 /**
  * @brief Serves a webpage from file
  *
@@ -149,17 +150,45 @@ bool HttpRequestHandler::serve(string url, vector<char>& response) {
     // e.g. https://www.example.com/show_file.php?file=../../MyFile
     // * Builds absolute local path from url
     // * Checks if absolute local path is within home path
-    auto homeAbsolutePath = filesystem::absolute(homePath);
-    auto relativePath = homeAbsolutePath / url.substr(1);
-    string path = filesystem::absolute(relativePath.make_preferred()).string();
 
-    if (path.substr(0, homeAbsolutePath.string().size()) != homeAbsolutePath)
+    cout << "=== SERVE DEBUG ===" << endl;
+    cout << "Input URL: " << url << endl;
+    cout << "Home path: " << homePath << endl;
+
+    auto homeAbsolutePath = filesystem::absolute(homePath);
+    cout << "Home absolute: " << homeAbsolutePath << endl;
+
+    auto relativePath = homeAbsolutePath / url.substr(1);
+    cout << "Relative path: " << relativePath << endl;
+
+    string path = filesystem::absolute(relativePath.make_preferred()).string();
+    cout << "Final path: " << path << endl;
+    cout << "File exists: " << filesystem::exists(path) << endl;
+
+    // Security check: prevent directory traversal
+    if (path.substr(0, homeAbsolutePath.string().size()) != homeAbsolutePath) {
+        cout << "SECURITY: Path outside home directory" << endl;
         return false;
+    }
+
+    // Check if file exists before trying to open
+    if (!filesystem::exists(path)) {
+        cout << "ERROR: File does not exist at: " << path << endl;
+        return false;
+    }
+
+    // Check if it's a regular file
+    if (!filesystem::is_regular_file(path)) {
+        cout << "ERROR: Not a regular file: " << path << endl;
+        return false;
+    }
 
     // Serves file
-    ifstream file(path);
-    if (file.fail())
+    ifstream file(path, ios::binary);
+    if (file.fail()) {
+        cout << "ERROR: Failed to open file: " << path << endl;
         return false;
+    }
 
     file.seekg(0, ios::end);
     size_t fileSize = file.tellg();
@@ -167,6 +196,9 @@ bool HttpRequestHandler::serve(string url, vector<char>& response) {
 
     response.resize(fileSize);
     file.read(response.data(), fileSize);
+
+    cout << "SUCCESS: Served " << fileSize << " bytes" << endl;
+    cout << "===================" << endl;
 
     return true;
 }
@@ -882,15 +914,18 @@ bool HttpRequestHandler::handleRequest(string url,
             // Build result HTML based on mode
             if (imagemode) {
                 // IMAGE MODE: Show thumbnail + title + snippet
+                // DO NOT encode the path for filesystem access, only for HTML display
                 string encodedPath = urlEncode(path);
 
                 responseString += "<div class=\"result image-result\">";
                 responseString += "<div class=\"image-thumbnail\">";
-                responseString += "<a href=\"" + path + "\"><img src=\"" + encodedPath + "\" alt=\"" + cleanedTitle + "\" /></a>";
+                // Use raw path for href (browser will handle encoding)
+                // Use encoded path for src to ensure special chars work
+                responseString += "<a href=\"" + path + "?view=1\"><img src=\"" + encodedPath + "\" alt=\"" + cleanedTitle + "\" /></a>";
                 responseString += "</div>";
                 responseString += "<div class=\"image-details\">";
                 responseString += "<div class=\"url\">" + displayUrl + "</div>";
-                responseString += "<a class=\"title\" href=\"" + path + "\">" + cleanedTitle + "</a>";
+                responseString += "<a class=\"title\" href=\"" + path + "?view=1\">" + cleanedTitle + "</a>";
                 responseString += "<div class=\"snippet\">" + snippet + "</div>";
                 responseString += "</div>";
                 responseString += "</div>";

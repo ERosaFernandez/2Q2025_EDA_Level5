@@ -1,5 +1,5 @@
 /**
- * @file HttpServer.h
+ * @file HttpServer.cpp
  * @author Marc S. Ressl
  * @brief Simple interface to libmicrohttpd
  * @version 0.3
@@ -22,12 +22,12 @@ using namespace std;
  * @return int #MHD_YES to continue iterating,
  *             #MHD_NO to abort the iteration
  */
-static MHD_Result httpGetArgumentCallback(void *cls,
-                                          enum MHD_ValueKind kind,
-                                          const char *key,
-                                          const char *value)
+static MHD_Result httpGetArgumentCallback(void* cls,
+    enum MHD_ValueKind kind,
+    const char* key,
+    const char* value)
 {
-    HttpArguments *arguments = (HttpArguments *)cls;
+    HttpArguments* arguments = (HttpArguments*)cls;
 
     if (value != NULL)
         (*arguments)[key] = value;
@@ -50,16 +50,16 @@ static MHD_Result httpGetArgumentCallback(void *cls,
  * @param con_cls Pointer that the callback can set
  * @return MHD_Result
  */
-MHD_Result httpRequestHandlerCallback(void *cls,
-                                      struct MHD_Connection *connection,
-                                      const char *url,
-                                      const char *method,
-                                      const char *version,
-                                      const char *upload_data,
-                                      size_t *upload_data_size,
-                                      void **con_cls)
+MHD_Result httpRequestHandlerCallback(void* cls,
+    struct MHD_Connection* connection,
+    const char* url,
+    const char* method,
+    const char* version,
+    const char* upload_data,
+    size_t* upload_data_size,
+    void** con_cls)
 {
-    HttpServer *server = (HttpServer *)cls;
+    HttpServer* server = (HttpServer*)cls;
 
     // Headers are invalid on first call, wait for second call.
     if (con_cls == NULL)
@@ -100,9 +100,9 @@ MHD_Result httpRequestHandlerCallback(void *cls,
             response.assign(errorResponse.begin(), errorResponse.end());
         }
 
-        MHD_Response *mhdResponse = MHD_create_response_from_buffer(response.size(),
-                                                                    (void *)response.data(),
-                                                                    MHD_RESPMEM_MUST_COPY);
+        MHD_Response* mhdResponse = MHD_create_response_from_buffer(response.size(),
+            (void*)response.data(),
+            MHD_RESPMEM_MUST_COPY);
         bool isResponseQueued = MHD_queue_response(connection, statusCode, mhdResponse);
         MHD_destroy_response(mhdResponse);
 
@@ -114,13 +114,14 @@ MHD_Result httpRequestHandlerCallback(void *cls,
 
 HttpServer::HttpServer(int port)
 {
+    // CRITICAL FIX: Use the 'port' parameter instead of hardcoded 8000
     daemon = MHD_start_daemon(MHD_USE_INTERNAL_POLLING_THREAD,
-                              8000,
-                              NULL,
-                              NULL,
-                              httpRequestHandlerCallback,
-                              this,
-                              MHD_OPTION_END);
+        port,
+        NULL,
+        NULL,
+        httpRequestHandlerCallback,
+        this,
+        MHD_OPTION_END);
 
     httpRequestHandler = NULL;
 }
@@ -138,7 +139,7 @@ bool HttpServer::isRunning()
     return daemon != NULL;
 }
 
-void HttpServer::setHttpRequestHandler(HttpRequestHandler *httpRequestHandler)
+void HttpServer::setHttpRequestHandler(HttpRequestHandler* httpRequestHandler)
 {
     this->httpRequestHandler = httpRequestHandler;
 }
