@@ -2,7 +2,7 @@
  * @file HttpRequestHandler.h
  * @author Marc S. Ressl
  * @brief EDAoggle search engine
- * @version 0.4
+ * @version 0.5
  *
  * @copyright Copyright (c) 2022-2024 Marc S. Ressl
  */
@@ -16,13 +16,13 @@
 #include "trie.h"
 
 class HttpRequestHandler {
-  public:
+public:
     HttpRequestHandler(std::string homePath, bool imagemode = 0);
     ~HttpRequestHandler();
 
     bool handleRequest(std::string url, HttpArguments arguments, std::vector<char>& response);
 
-  private:
+private:
     bool serve(std::string path, std::vector<char>& response);
     bool loadVocabularyIntoTrie();
 

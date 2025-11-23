@@ -6,10 +6,14 @@
     <title>EDAoogle</title>
     <link rel="preload" href="https://fonts.googleapis.com" />
     <link rel="preload" href="https://fonts.gstatic.com" crossorigin />
-    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;800&display=swap" rel="stylesheet" />
-    <link rel="preload" href="../css/style.css" />
-    <link rel="stylesheet" href="../css/style.css" />
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600&display=swap" rel="stylesheet" />
+    <link rel="preload" href="css/style.css" />
+    <link rel="stylesheet" href="css/style.css" />
     <style>
+        .search {
+            position: relative;
+        }
+
         #suggestions {
             position: absolute;
             background: white;
@@ -20,6 +24,10 @@
             display: none;
             z-index: 1000;
             box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
+            width: min(90vw, 500px);
+            top: 100%;
+            left: 0;
+            margin-top: 4px;
         }
 
         .suggestion-item {
@@ -28,18 +36,22 @@
             border-bottom: 1px solid #f0f0f0;
         }
 
-        .suggestion-item:hover {
-            background-color: #f5f5f5;
-        }
+            .suggestion-item:last-child {
+                border-bottom: none;
+            }
+
+            .suggestion-item:hover {
+                background-color: #f5f5f5;
+            }
     </style>
     <script>
         document.addEventListener('DOMContentLoaded', () => {
             const input = document.querySelector('input[name="q"]');
             const form = document.querySelector('form');
+            const searchContainer = document.querySelector('.search');
             let suggestionsDiv = document.createElement('div');
             suggestionsDiv.id = 'suggestions';
-            input.parentNode.style.position = 'relative';
-            input.parentNode.appendChild(suggestionsDiv);
+            searchContainer.appendChild(suggestionsDiv);
 
             let debounceTimer;
 
@@ -47,7 +59,6 @@
                 clearTimeout(debounceTimer);
 
                 const fullQuery = e.target.value;
-
                 const words = fullQuery.split(' ');
                 const lastWord = words[words.length - 1].trim();
 
@@ -58,7 +69,8 @@
 
                 debounceTimer = setTimeout(async () => {
                     try {
-                        const response = await fetch('/predict?q=' + encodeURIComponent(lastWord)); const suggestions = await response.json();
+                        const response = await fetch('/predict?q=' + encodeURIComponent(lastWord));
+                        const suggestions = await response.json();
 
                         if (suggestions.length > 0) {
                             suggestionsDiv.innerHTML = '';
@@ -85,7 +97,7 @@
             });
 
             document.addEventListener('click', (e) => {
-                if (e.target !== input) {
+                if (e.target !== input && !suggestionsDiv.contains(e.target)) {
                     suggestionsDiv.style.display = 'none';
                 }
             });

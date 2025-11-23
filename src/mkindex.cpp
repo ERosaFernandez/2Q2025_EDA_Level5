@@ -2,7 +2,7 @@
  * @file mkindex.cpp
  * @author Marc S. Ressl
  * @brief Makes a database index
- * @version 0.3
+ * @version 0.4
  *
  * @copyright Copyright (c) 2022-2024 Marc S. Ressl
  */
@@ -15,9 +15,11 @@
 #include <fstream>
 #include <iostream>
 #include <set>
+#include <sstream>
 #include <string>
 
 #include "CommandLineParser.h"
+#include <codecvt>
 
 using namespace std;
 
@@ -91,6 +93,53 @@ string removeHTMLTags(const string& html) {
     return normalized;
 }
 
+/**
+ * @brief Generates a snippet from cleaned text content
+ *
+ * @param cleanText Already cleaned text (no HTML tags)
+ * @param maxWords Maximum number of words in snippet
+ * @return Snippet text with ellipsis if truncated
+ */
+string generateSnippetFromCleanText(const string& cleanText, int maxWords = 100) {
+    if (cleanText.empty()) {
+        return "";
+    }
+
+    // Extract first N words
+    istringstream iss(cleanText);
+    string word;
+    vector<string> words;
+
+    while (iss >> word && words.size() < maxWords) {
+        words.push_back(word);
+    }
+
+    if (words.empty()) {
+        return "";
+    }
+
+    // Join words
+    string snippet;
+    for (size_t i = 0; i < words.size(); i++) {
+        snippet += words[i];
+        if (i < words.size() - 1) {
+            snippet += " ";
+        }
+    }
+
+    // Add ellipsis if there are more words
+    bool hasMore = false;
+    if (iss >> word) {
+        hasMore = true;
+    }
+
+    if (hasMore || words.size() == maxWords) {
+        snippet += "...";
+    }
+
+    return snippet;
+}
+
 size_t vocabulary(const string& cleanContent,
                   std::wstring_convert<std::codecvt_utf8<char32_t>, char32_t>& converter,
                   set<string>& vocabSet) {
@@ -151,7 +200,7 @@ int main(int argc, const char* argv[]) {
     }
 
     if (!skipProcess || (skipProcess && parser.getOption("-skip") != "index")) {
-        cout << "Skips Indexing..." << endl;
+        cout << "Starting Indexing..." << endl;
 
         //============================== INDEXING =============================//
 
@@ -163,15 +212,25 @@ int main(int argc, const char* argv[]) {
             return 1;
         }
 
-        // Create FTS5 virtual table
+        // Create FTS5 virtual table with snippet column
         const char* tableName = imageMode ? "images_index" : "webpage_index";
         cout << "Creating FTS5 virtual table: " << tableName << "..." << endl;
 
+        // First, drop the old table if it exists to ensure clean migration
+        string dropTableSQL = string("DROP TABLE IF EXISTS ") + tableName + ";";
+        if (sqlite3_exec(database, dropTableSQL.c_str(), NULL, 0, &databaseErrorMessage) !=
+            SQLITE_OK) {
+            cout << "Warning dropping old table: " << sqlite3_errmsg(database) << endl;
+            // Continue anyway - table might not exist
+        }
+
+        // Now create the new table with snippet column
         string createTableSQL = string("CREATE VIRTUAL TABLE IF NOT EXISTS ") + tableName +
                                 " USING fts5("
                                 "path UNINDEXED,"
                                 "title,"
-                                "content);";
+                                "content,"
+                                "snippet UNINDEXED);";
 
         if (sqlite3_exec(database, createTableSQL.c_str(), NULL, 0, &databaseErrorMessage) !=
             SQLITE_OK) {
@@ -180,26 +239,23 @@ int main(int argc, const char* argv[]) {
             return 1;
         }
 
-        // Delete previous entries if table already existed
-        cout << "Deleting previous entries..." << endl;
+        // Delete previous entries if table already existed (redundant after DROP but safe)
+        cout << "Ensuring table is empty..." << endl;
         string deleteSQL = string("DELETE FROM ") + tableName + ";";
         if (sqlite3_exec(database, deleteSQL.c_str(), NULL, 0, &databaseErrorMessage) !=
             SQLITE_OK) {
-            cout << "Error: " << sqlite3_errmsg(database) << endl;
-            sqlite3_close(database);
-            return 1;
+            cout << "Note: " << sqlite3_errmsg(database) << " (this is normal for new tables)" << endl;
         }
 
         // Begin transaction
         cout << "Starting transaction..." << endl;
         sqlite3_exec(database, "BEGIN TRANSACTION;", NULL, 0, NULL);
 
-        // Prepare SQL statement
+        // Prepare SQL statement with snippet column
         cout << "Preparing SQL statement..." << endl;
         sqlite3_stmt* stmt;
-        string insertSQL =
-            string("INSERT INTO ") + tableName + " (path, title, content) VALUES (?, ?, ?);";
-        // const char* sql = "INSERT INTO webpage_index (path, title, content) VALUES (?, ?, ?);";
+        string insertSQL = string("INSERT INTO ") + tableName +
+                           " (path, title, content, snippet) VALUES (?, ?, ?, ?);";
 
         if (sqlite3_prepare_v2(database, insertSQL.c_str(), -1, &stmt, NULL) != SQLITE_OK) {
             cout << "Error preparing statement: " << sqlite3_errmsg(database) << endl;
@@ -232,7 +288,7 @@ int main(int argc, const char* argv[]) {
                                        istreambuf_iterator<char>());
                     fileStream.close();
 
-                    // Exrtact title
+                    // Extract title
                     string title = "No Title";
                     size_t titleStart = htmlContent.find("<title>");
                     size_t titleEnd = htmlContent.find("</title>");
@@ -243,21 +299,25 @@ int main(int argc, const char* argv[]) {
                     }
 
                     // Parse HTML content to plain text
-                    string cleanContent =
-                        removeHTMLTags(htmlContent);  // ← Función que implementarás
+                    string cleanContent = removeHTMLTags(htmlContent);
+
+                    // Generate snippet from clean content (first 25 words)
+                    string snippet = generateSnippetFromCleanText(cleanContent, 60);
 
                     // Sets relative path
                     string relativePath = "/wiki/" + entry.path().filename().string();
 
                     // Generates vocabulary
-                    cout << "Succesfully extracted vocabulary."
-                         << "  Vocabulary size: " << vocabulary(cleanContent, converter, vocabSet)
+                    cout << "  Successfully extracted vocabulary. "
+                         << "Vocabulary size: " << vocabulary(cleanContent, converter, vocabSet)
                          << endl;
+                    cout << "  Generated snippet: " << snippet.substr(0, 50) << "..." << endl;
 
                     // Bind values to the prepared statement
                     sqlite3_bind_text(stmt, 1, relativePath.c_str(), -1, SQLITE_TRANSIENT);
                     sqlite3_bind_text(stmt, 2, title.c_str(), -1, SQLITE_TRANSIENT);
                     sqlite3_bind_text(stmt, 3, cleanContent.c_str(), -1, SQLITE_TRANSIENT);
+                    sqlite3_bind_text(stmt, 4, snippet.c_str(), -1, SQLITE_TRANSIENT);
 
                     // Executes statement
                     if (sqlite3_step(stmt) != SQLITE_DONE) {
@@ -290,18 +350,22 @@ int main(int argc, const char* argv[]) {
                 string title = filename;
                 string cleanContent = filename;
 
+                // Generate snippet for images (just the filename)
+                string snippet = "Image: " + filename;
+
                 // Sets relative path
                 string relativePath = "/special/" + entry.path().filename().string();
 
                 // Generates vocabulary
-                cout << "Succesfully extracted vocabulary."
-                     << "  Vocabulary size: " << vocabulary(cleanContent, converter, vocabSet)
+                cout << "  Successfully extracted vocabulary. "
+                     << "Vocabulary size: " << vocabulary(cleanContent, converter, vocabSet)
                      << endl;
 
                 // Bind values to the prepared statement
                 sqlite3_bind_text(stmt, 1, relativePath.c_str(), -1, SQLITE_TRANSIENT);
                 sqlite3_bind_text(stmt, 2, title.c_str(), -1, SQLITE_TRANSIENT);
                 sqlite3_bind_text(stmt, 3, cleanContent.c_str(), -1, SQLITE_TRANSIENT);
+                sqlite3_bind_text(stmt, 4, snippet.c_str(), -1, SQLITE_TRANSIENT);
 
                 // Executes statement
                 if (sqlite3_step(stmt) != SQLITE_DONE) {
@@ -330,7 +394,7 @@ int main(int argc, const char* argv[]) {
         sqlite3_close(database);
     }
     if (!skipProcess || (skipProcess && parser.getOption("-skip") != "vocab")) {
-        cout << "Skips Vocabulary Indexing..." << endl;
+        cout << "Starting Vocabulary Indexing..." << endl;
 
         //============================ VOCABULARY INDEXING =============================//
 
