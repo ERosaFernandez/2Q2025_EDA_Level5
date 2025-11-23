@@ -110,7 +110,7 @@ size_t vocabulary(const string& cleanContent,
             word.clear();
     }
     // Adds last word if applicable
-    if (word.size() >= 3) {
+    if (word.size() >= 5) {
         vocabSet.insert(converter.to_bytes(word));
         word.clear();
     }

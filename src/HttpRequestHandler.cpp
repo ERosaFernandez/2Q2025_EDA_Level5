@@ -23,6 +23,7 @@ using namespace std;
 
 HttpRequestHandler::HttpRequestHandler(string homePath, bool imageMode) {
     this->homePath = homePath;
+    this->imagemode = imageMode;
 
     // Sets up database location and table name
     const char* dbFile = imageMode ? "images.db" : "index.db";
@@ -88,7 +89,7 @@ bool HttpRequestHandler::loadVocabularyIntoTrie() {
                 if (u_isalpha(c)) {
                     // Builds word character by character
                     word.push_back(u_tolower(c));
-                } else if (word.size() >= 3) {
+                } else if (word.size() >= 5) {
                     // Inserts word into Trie once a non-word character is found
                     trie->insert(word);
                     word.clear();
@@ -109,6 +110,8 @@ bool HttpRequestHandler::loadVocabularyIntoTrie() {
 
     sqlite3_finalize(stmt);
     cout << "Total words inserted: " << words << endl;
+    sqlite3_close(database_vocab);
+    cout << "Vocabulary closed" << endl;
     return true;
 }
 
@@ -166,9 +169,11 @@ bool HttpRequestHandler::handleRequest(string url,
     //=============== PREDICT HANDLER ===============//
     string predictPage = "/predict";
     if (url.substr(0, predictPage.size()) == predictPage) {
+        cout << "Predict request received" << endl;
         string query;
         if (arguments.find("q") != arguments.end())
             query = arguments["q"];
+        cout << "Query: " << query << endl;
 
         // Collect suggestions from Trie
         size_t numSuggestions = trie->collectSuggestions(query, 10);
@@ -281,16 +286,18 @@ bool HttpRequestHandler::handleRequest(string url,
             input.addEventListener('input', (e) => {\
                 clearTimeout(debounceTimer);\
                 \
-                const query = e.target.value.trim();\
+                const fullQuery = e.target.value;\
+                const words = fullQuery.split(' ');\
+                const lastWord = words[words.length - 1].trim();\
                 \
-                if (query.length < 2) {\
+                if (lastWord.length < 2) {\
                     suggestionsDiv.style.display = 'none';\
                     return;\
                 }\
                 \
                 debounceTimer = setTimeout(async () => {\
                     try {\
-                        const response = await fetch('/predict?q=' + encodeURIComponent(query));\
+                        const response = await fetch('/predict?q=' + encodeURIComponent(lastWord));\
                         const suggestions = await response.json();\
                         \
                         if (suggestions.length > 0) {\
@@ -300,9 +307,10 @@ bool HttpRequestHandler::handleRequest(string url,
                                 div.className = 'suggestion-item';\
                                 div.textContent = suggestion;\
                                 div.onclick = () => {\
-                                    input.value = suggestion;\
+                                    words[words.length - 1] = suggestion;\
+                                    input.value = words.join(' ') + ' ';\
                                     suggestionsDiv.style.display = 'none';\
-                                    form.submit();\
+                                    input.focus();\
                                 };\
                                 suggestionsDiv.appendChild(div);\
                             });\
