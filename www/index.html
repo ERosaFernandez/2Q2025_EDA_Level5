@@ -210,6 +210,7 @@
         /* Search box */
         .search-box {
             position: relative;
+            z-index: 20; /* Elevated to ensure suggestions overlay buttons */
             margin-bottom: 30px;
             animation: searchAppear 1s ease-out 0.3s both;
         }
@@ -290,37 +291,6 @@
                 color: #9aa0a6;
             }
 
-        .voice-icon {
-            cursor: pointer;
-            padding: 8px;
-            border-radius: 50%;
-            transition: all 0.3s ease;
-            color: var(--google-blue);
-            font-size: 20px;
-            display: flex;
-            align-items: center;
-            justify-content: center;
-        }
-
-            .voice-icon:hover {
-                background: rgba(66, 133, 244, 0.1);
-            }
-
-            .voice-icon.listening {
-                animation: pulse 1.5s ease-in-out infinite;
-                color: var(--google-red);
-            }
-
-        @keyframes pulse {
-            0%, 100% {
-                transform: scale(1);
-            }
-
-            50% {
-                transform: scale(1.2);
-            }
-        }
-
         /* Suggestions dropdown */
         #suggestions {
             position: absolute;
@@ -334,6 +304,7 @@
             overflow-y: auto;
             display: none;
             animation: dropdownAppear 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+            z-index: 10000; /* High z-index to appear on top */
         }
 
         @keyframes dropdownAppear {
@@ -491,7 +462,7 @@
     <canvas id="particles"></canvas>
 
     <!-- Overlay to block interactions when suggestions are open -->
-    <div id="suggestions-overlay"></div>
+    <div id="suggestions-overlay" style="z-index: 9999;"></div>
 
     <div class="container">
         <div class="logo">
@@ -506,7 +477,6 @@
                     <div class="search-input-wrapper">
                         <span class="search-icon">🔍</span>
                         <input type="text" name="q" autocomplete="off" placeholder="Buscar en EDAoogle..." autofocus>
-                        <div class="voice-icon" id="voiceBtn" title="Búsqueda por voz">🎤</div>
                     </div>
                 </div>
                 <div id="suggestions"></div>
@@ -644,17 +614,6 @@
         suggestionsOverlay.addEventListener('click', () => {
             suggestionsDiv.classList.remove('show');
             suggestionsOverlay.classList.remove('show');
-        });
-
-        // Voice search simulation
-        const voiceBtn = document.getElementById('voiceBtn');
-        voiceBtn.addEventListener('click', () => {
-            voiceBtn.classList.add('listening');
-            setTimeout(() => {
-                voiceBtn.classList.remove('listening');
-                input.value = 'Búsqueda por voz simulada';
-                input.focus();
-            }, 2000);
         });
 
         // Lucky search - gets a random entry from database

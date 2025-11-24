@@ -140,242 +140,239 @@ namespace Responses {
     inline string imagePageResponse(string cleanedTitle, string encodedImageUrl, string filename, string cleanUrlStr) {
         return string(
             "<!DOCTYPE html>\
-            <html>\
-            <head>\
-                <meta charset=\"utf-8\" />\
-                <title>") +
-                cleanedTitle +
-                        string(
-                            " - EDAoogle</title>\
-                <link rel=\"preload\" href=\"https://fonts.googleapis.com\" />\
-                <link rel=\"preload\" href=\"https://fonts.gstatic.com\" crossorigin />\
-                <link href=\"https://fonts.googleapis.com/css2?family=Inter:wght@400;600&display=swap\" rel=\"stylesheet\" />\
-                <link rel=\"stylesheet\" href=\"../css/style.css\" />\
-                <style>\
+        <html>\
+        <head>\
+            <meta charset=\"utf-8\" />\
+            <title>") +
+            cleanedTitle +
+            string(
+                " - EDAoogle</title>\
+            <link rel=\"preload\" href=\"https://fonts.googleapis.com\" />\
+            <link rel=\"preload\" href=\"https://fonts.gstatic.com\" crossorigin />\
+            <link href=\"https://fonts.googleapis.com/css2?family=Inter:wght@400;600&display=swap\" rel=\"stylesheet\" />\
+            <link rel=\"stylesheet\" href=\"../css/style.css\" />\
+            <style>\
+                :root {\
+                    --bg: #ffffff;\
+                    --text: #202124;\
+                    --shadow: rgba(0,0,0,0.1);\
+                    --accent: #4285f4;\
+                }\
+                @media (prefers-color-scheme: dark) {\
+                    :root {\
+                        --bg: #202124;\
+                        --text: #e8eaed;\
+                        --shadow: rgba(0,0,0,0.3);\
+                    }\
+                }\
+                body {\
+                    font-family: Inter, sans-serif;\
+                    margin: 0;\
+                    padding: 0;\
+                    background: var(--bg);\
+                    color: var(--text);\
+                    display: flex;\
+                    flex-direction: column;\
+                    min-height: 100vh;\
+                }\
+                .image-viewer {\
+                    max-width: 1200px;\
+                    margin: 2rem auto;\
+                    padding: 0 2rem;\
+                    flex-grow: 1;\
+                }\
+                .image-header {\
+                    display: flex;\
+                    justify-content: space-between;\
+                    align-items: center;\
+                    margin-bottom: 1rem;\
+                }\
+                .back-link {\
+                    color: var(--accent);\
+                    text-decoration: none;\
+                    font-weight: 600;\
+                }\
+                .image-title {\
+                    font-size: 1.5rem;\
+                    font-weight: 600;\
+                }\
+                .image-main {\
+                    position: relative;\
+                    margin-bottom: 2rem;\
+                    border-radius: 12px;\
+                    overflow: hidden;\
+                    box-shadow: 0 4px 16px var(--shadow);\
+                    transition: all 0.3s ease;\
+                }\
+                .image-main img {\
+                    width: 100%;\
+                    height: auto;\
+                    display: block;\
+                    object-fit: contain;\
+                    max-height: 80vh;\
+                    loading: lazy;\
+                }\
+                .zoom-controls {\
+                    position: absolute;\
+                    bottom: 1rem;\
+                    right: 1rem;\
+                    display: flex;\
+                    gap: 0.5rem;\
+                }\
+                .zoom-btn {\
+                    background: rgba(255,255,255,0.8);\
+                    border: none;\
+                    padding: 0.5rem;\
+                    border-radius: 50%;\
+                    cursor: pointer;\
+                    transition: background 0.2s;\
+                }\
+                .zoom-btn:hover {\
+                    background: rgba(255,255,255,1);\
+                }\
+                .image-details {\
+                    background: rgba(0,0,0,0.05);\
+                    padding: 1rem;\
+                    border-radius: 8px;\
+                }\
+                .detail-item {\
+                    margin-bottom: 0.5rem;\
+                }\
+                .detail-label {\
+                    font-weight: 600;\
+                }\
+                @media (max-width: 768px) {\
                     .image-viewer {\
-                        max-width: 1200px;\
-                        margin: 2rem auto;\
-                        padding: 0 2rem;\
+                        padding: 0 1rem;\
                     }\
-                    .image-header {\
-                        margin-bottom: 2rem;\
+                    .image-main img {\
+                        max-height: 60vh;\
                     }\
-                    .back-link {\
-                        color: #1a0dab;\
-                        text-decoration: none;\
-                        font-size: 0.9rem;\
-                        display: inline-block;\
-                        margin-bottom: 1rem;\
-                    }\
-                    .back-link:hover {\
-                        text-decoration: underline;\
-                    }\
-                    .image-title {\
-                        font-size: 2rem;\
-                        font-weight: 600;\
-                        color: #202124;\
-                        margin-bottom: 0.5rem;\
-                    }\
-                    .image-filename {\
-                        font-size: 0.9rem;\
-                        color: #70757a;\
-                    }\
-                    .image-container {\
-                        background: #f8f9fa;\
-                        border-radius: 8px;\
-                        padding: 2rem;\
-                        text-align: center;\
-                        box-shadow: 0 1px 3px rgba(0,0,0,0.1);\
-                    }\
-                    .image-container img {\
-                        max-width: 100%;\
-                        height: auto;\
-                        border-radius: 4px;\
-                        box-shadow: 0 2px 8px rgba(0,0,0,0.15);\
-                    }\
-                    .image-info {\
-                        margin-top: 1.5rem;\
-                        text-align: left;\
-                        background: white;\
-                        padding: 1.5rem;\
-                        border-radius: 8px;\
-                        box-shadow: 0 1px 3px rgba(0,0,0,0.1);\
-                    }\
-                    .info-row {\
-                        margin-bottom: 0.75rem;\
-                    }\
-                    .info-label {\
-                        font-weight: 600;\
-                        color: #202124;\
-                    }\
-                    .info-value {\
-                        color: #5f6368;\
-                    }\
-                </style>\
-            </head>\
-            <body>\
-                <div class=\"image-viewer\">\
-                    <div class=\"image-header\">\
-                        <a href=\"/\" class=\"back-link\">← Volver a EDAoogle</a>\
-                        <h1 class=\"image-title\">") +
-                        cleanedTitle +
-                string(
-                    "</h1>\
-                        <div class=\"image-filename\">") +
-                filename +
-                string(
-                    "</div>\
-                    </div>\
-                    <div class=\"image-container\">\
-                        <img src=\"") +
-                encodedImageUrl + string("\" alt=\"") + cleanedTitle +
-                string(
-                    "\" onerror=\"this.onerror=null; this.src=''; this.alt='Error: Imagen no encontrada';\" />\
-                    </div>\
-                    <div class=\"image-info\">\
-                        <div class=\"info-row\">\
-                            <span class=\"info-label\">Nombre del archivo:</span> \
-                            <span class=\"info-value\">") +
-                filename +
-                string(
-                    "</span>\
-                        </div>\
-                        <div class=\"info-row\">\
-                            <span class=\"info-label\">Ubicación:</span> \
-                            <span class=\"info-value\">") +
-                cleanUrlStr +
-                string(
-                    "</span>\
-                        </div>\
+                }\
+            </style>\
+        </head>\
+        <body>\
+            <div class=\"image-viewer\">\
+                <div class=\"image-header\">\
+                    <a href=\"/\" class=\"back-link\">Volver a EDAoogle</a>\
+                    <h1 class=\"image-title\">") + cleanedTitle + string("</h1>\
+                </div>\
+                <div class=\"image-main\" role=\"region\" aria-label=\"Vista de imagen\">\
+                    <img src=\"") + encodedImageUrl + string("\" alt=\"") + cleanedTitle + string(" - Imagen detallada\" loading=\"lazy\">\
+                    <div class=\"zoom-controls\">\
+                        <button class=\"zoom-btn\" onclick=\"zoomIn()\">+</button>\
+                        <button class=\"zoom-btn\" onclick=\"zoomOut()\">-</button>\
+                        <button class=\"zoom-btn\" onclick=\"fullScreen()\">⤢</button>\
                     </div>\
                 </div>\
-            </body>\
-            </html>");
+                <div class=\"image-details\">\
+                    <div class=\"detail-item\"><span class=\"detail-label\">Nombre del archivo:</span> ") + filename + string("</div>\
+                    <div class=\"detail-item\"><span class=\"detail-label\">Ubicacion:</span> ") + cleanUrlStr + string("</div>\
+                </div>\
+            </div>\
+            <script>\
+                let zoomLevel = 1;\
+                const img = document.querySelector('.image-main img');\
+                function zoomIn() {\
+                    zoomLevel += 0.1;\
+                    img.style.transform = `scale(${zoomLevel})`;\
+                }\
+                function zoomOut() {\
+                    zoomLevel = Math.max(1, zoomLevel - 0.1);\
+                    img.style.transform = `scale(${zoomLevel})`;\
+                }\
+                function fullScreen() {\
+                    if (img.requestFullscreen) img.requestFullscreen();\
+                }\
+            </script>\
+        </body>\
+        </html>");
     }
 
-    inline string searchPageStart(string searchString)
-    {
-        return R"(<!DOCTYPE html>
-            <head>
-            <meta charset = "UTF-8">
-            <meta name = "viewport" content = "width=device-width, initial-scale=1.0">
-            <title>)" + searchString +
-            R"( - EDAoogle</title>
-            <link rel="preconnect" href="https://fonts.googleapis.com">
-            <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-            <link href="https://fonts.googleapis.com/css2?family=Product+Sans:wght@400;500;700&display=swap" rel="stylesheet">
+    inline string searchPageStart(string searchString) {
+        return R"(
+        <!DOCTYPE html>
+        <html lang="es">
+        <head>
+            <meta charset="UTF-8">
+            <meta name="viewport" content="width=device-width, initial-scale=1.0">
+            <title>EDAoogle - Resultados</title>
+            <link rel="preload" href="https://fonts.googleapis.com" />
+            <link rel="preload" href="https://fonts.gstatic.com" crossorigin />
+            <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600&display=swap" rel="stylesheet" />
+            <link rel="preload" href="css/style.css" />
+            <link rel="stylesheet" href="css/style.css" />
             <style>
-                * {
-                    margin: 0;
-                    padding: 0;
-                    box-sizing: border-box;
-                }
-
                 :root {
                     --google-blue: #4285f4;
-                    --google-red: #ea4335;
-                    --google-green: #34a853;
-                    --purple-accent: #a142f4;
-                    --bg-light: #ffffff;
-                    --bg-dark: #202124;
-                    --text-light: #202124;
-                    --text-dark: #e8eaed;
-                    --input-light: #ffffff;
-                    --input-dark: #303134;
-                    --shadow-light: rgba(0, 0, 0, 0.1);
-                    --shadow-dark: rgba(0, 0, 0, 0.3);
+                    --shadow: rgba(0, 0, 0, 0.1);
+                    --text: #202124;
+                    --input-bg: #ffffff;
+                    --bg-light: #fcfcfc;
                 }
 
                 @media (prefers-color-scheme: dark) {
                     :root {
-                        --bg: var(--bg-dark);
-                        --text: var(--text-dark);
-                        --input-bg: var(--input-dark);
-                        --shadow: var(--shadow-dark);
-                    }
-                }
-
-                @media (prefers-color-scheme: light) {
-                    :root {
-                        --bg: var(--bg-light);
-                        --text: var(--text-light);
-                        --input-bg: var(--input-light);
-                        --shadow: var(--shadow-light);
+                        --google-blue: #4285f4;
+                        --shadow: rgba(0, 0, 0, 0.3);
+                        --text: #e8eaed;
+                        --input-bg: #303134;
+                        --bg-light: #202124;
                     }
                 }
 
                 body {
-                    font-family: 'Product Sans', 'Roboto', 'Arial', sans-serif;
-                    background: var(--bg);
+                    font-family: Inter, sans-serif;
+                    margin: 0;
+                    padding: 0;
+                    background: var(--bg-light);
                     color: var(--text);
-                    min-height: 100vh;
-                    transition: background 0.3s ease, color 0.3s ease;
                 }
 
                 header {
-                    position: sticky;
-                    top: 0;
-                    background: var(--bg);
-                    border-bottom: 1px solid rgba(128, 128, 128, 0.1);
-                    padding: 16px 24px;
                     display: flex;
                     align-items: center;
-                    gap: 32px;
-                    z-index: 100;
-                    box-shadow: 0 1px 6px var(--shadow);
-                    backdrop-filter: blur(10px);
-                    animation: slideDown 0.4s ease-out;
-                }
-
-                @keyframes slideDown {
-                    from {
-                        transform: translateY(-100%);
-                        opacity: 0;
-                    }
-                    to {
-                        transform: translateY(0);
-                        opacity: 1;
-                    }
+                    padding: 16px 24px;
+                    border-bottom: 1px solid rgba(128, 128, 128, 0.1);
+                    gap: 24px;
+                    background: var(--bg-light); /* Integrate with background */
                 }
 
                 .logo-small {
-                    font-size: 24px;
-                    font-weight: 400;
+                    font-size: 1.5rem;
+                    font-weight: 600;
                     text-decoration: none;
-                    letter-spacing: -1px;
-                    transition: transform 0.3s ease;
-                    white-space: nowrap;
                 }
 
-                .logo-small:hover {
-                    transform: scale(1.05);
-                }
-
-                .logo-small span:nth-child(1) { color: var(--google-blue); }
-                .logo-small span:nth-child(2) { color: var(--google-red); }
+                .logo-small span:nth-child(1) { color: #4285f4; }
+                .logo-small span:nth-child(2) { color: #ea4335; }
                 .logo-small span:nth-child(3) { color: #fbbc04; }
-                .logo-small span:nth-child(4) { color: var(--google-blue); }
-                .logo-small span:nth-child(5) { color: var(--google-green); }
-                .logo-small span:nth-child(6) { color: var(--google-red); }
-                .logo-small span:nth-child(7) { color: var(--purple-accent); }
+                .logo-small span:nth-child(4) { color: #4285f4; }
+                .logo-small span:nth-child(5) { color: #34a853; }
+                .logo-small span:nth-child(6) { color: #ea4335; }
+                .logo-small span:nth-child(7) { color: #a142f4; }
                 .logo-small span:nth-child(8) { color: #24c1e0; }
 
                 .search-header {
                     flex: 1;
                     max-width: 600px;
+                }
+
+                form {
                     position: relative;
                 }
 
                 .search-container {
-                    position: relative;
                     background: var(--input-bg);
                     border-radius: 24px;
                     box-shadow: 0 1px 6px var(--shadow);
-                    transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+                    overflow: hidden;
+                    border: 1px solid #dfe1e5; /* Added subtle border for integration */
+                    transition: box-shadow 0.2s ease; /* Smooth hover effect */
                 }
 
-                .search-container:focus-within {
-                    box-shadow: 0 4px 20px rgba(66, 133, 244, 0.3);
+                .search-container:hover {
+                    box-shadow: 0 2px 8px var(--shadow);
                 }
 
                 .search-input-wrapper {
@@ -384,70 +381,41 @@ namespace Responses {
                     padding: 0 16px;
                 }
 
-                .search-icon {
-                    color: #9aa0a6;
-                    margin-right: 12px;
-                    font-size: 18px;
-                }
-
                 input[type="text"] {
                     flex: 1;
                     border: none;
                     outline: none;
-                    padding: 10px 0;
+                    padding: 12px 0;
                     font-size: 16px;
                     background: transparent;
                     color: var(--text);
-                    font-family: inherit;
                 }
 
                 button[type="submit"] {
                     padding: 8px 16px;
-                    border: none;
-                    border-radius: 8px;
-                    font-size: 14px;
-                    font-family: inherit;
-                    font-weight: 500;
-                    cursor: pointer;
                     background: var(--google-blue);
                     color: white;
-                    transition: all 0.3s ease;
-                    margin-left: 12px;
-                }
-
-                button[type="submit"]:hover {
-                    background: #1a73e8;
-                    transform: scale(1.05);
+                    border: none;
+                    border-radius: 4px;
+                    cursor: pointer;
+                    font-size: 14px;
                 }
 
                 #suggestions {
                     position: absolute;
-                    top: calc(100% + 8px);
-                    left: 0;
-                    right: 0;
                     background: var(--input-bg);
-                    border-radius: 16px;
-                    box-shadow: 0 8px 32px var(--shadow);
-                    max-height: 400px;
+                    border-radius: 8px;
+                    box-shadow: 0 2px 8px var(--shadow);
+                    width: 100%;
+                    max-height: 300px;
                     overflow-y: auto;
                     display: none;
-                    z-index: 10001;
+                    z-index: 10000;
+                    top: calc(100% + 4px);
                 }
 
                 #suggestions.show {
                     display: block;
-                    animation: dropdownAppear 0.3s ease;
-                }
-
-                @keyframes dropdownAppear {
-                    from {
-                        opacity: 0;
-                        transform: translateY(-10px);
-                    }
-                    to {
-                        opacity: 1;
-                        transform: translateY(0);
-                    }
                 }
 
                 #suggestions-overlay {
@@ -457,7 +425,7 @@ namespace Responses {
                     width: 100%;
                     height: 100%;
                     background: transparent;
-                    z-index: 10000;
+                    z-index: 9999;
                     display: none;
                 }
 
@@ -486,6 +454,7 @@ namespace Responses {
                     max-width: 800px;
                     margin: 0 auto;
                     padding: 24px;
+                    background: var(--bg-light); /* Consistent with body */
                 }
 
                 .results-stats {
@@ -572,6 +541,8 @@ namespace Responses {
                     display: flex;
                     gap: 16px;
                     align-items: flex-start;
+                    flex-direction: row-reverse; /* Image on the right */
+                    justify-content: flex-start;
                 }
 
                 .image-thumbnail {
@@ -580,6 +551,7 @@ namespace Responses {
                     overflow: hidden;
                     box-shadow: 0 2px 8px var(--shadow);
                     transition: all 0.3s ease;
+                    align-self: stretch; /* Stretch to match text height */
                 }
 
                 .image-thumbnail:hover {
@@ -588,14 +560,15 @@ namespace Responses {
                 }
 
                 .image-thumbnail img {
-                    width: 200px;
-                    height: 200px;
-                    object-fit: cover;
+                    max-width: 300px; /* Larger width */
+                    height: 100%; /* Fill container height */
+                    object-fit: contain; /* Maintain aspect ratio without cropping */
                     display: block;
                 }
 
                 .image-details {
                     flex: 1;
+                    min-height: 150px; /* Approximate height for text block */
                 }
 
                 @media (max-width: 768px) {
@@ -614,11 +587,12 @@ namespace Responses {
                     }
 
                     .image-result {
-                        flex-direction: column;
+                        flex-direction: column-reverse; /* Image below on mobile for better flow */
                     }
 
                     .image-thumbnail img {
                         width: 100%;
+                        max-width: none;
                         height: auto;
                     }
                 }
@@ -653,8 +627,7 @@ namespace Responses {
                     <form action="/search" method="get">
                         <div class="search-container">
                             <div class="search-input-wrapper">
-                                <input type="text" name="q" value=")" +
-                    searchString + R"(" autocomplete="off" autofocus>
+                                <input type="text" name="q" value=")" + searchString + R"(" autocomplete="off" autofocus>
                                 <button type="submit">Buscar</button>
                             </div>
                         </div>
@@ -663,14 +636,12 @@ namespace Responses {
                 </div>
             </header>
 
-            <main>)";
-            
+            <main>
+    )";
     }
 
-    inline string searchPageEnd()
-    {
+    inline string searchPageEnd() {
         return R"(
-            </div>
             </main>
 
             <script>
@@ -757,7 +728,7 @@ namespace Responses {
             </script>
         </body>
         </html>
-        )";
+    )";
     }
 }
 
