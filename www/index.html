@@ -1,120 +1,702 @@
 <!DOCTYPE html>
-<html>
-
+<html lang="es">
 <head>
-    <meta charset="utf-8" />
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>EDAoogle</title>
-    <link rel="preload" href="https://fonts.googleapis.com" />
-    <link rel="preload" href="https://fonts.gstatic.com" crossorigin />
-    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600&display=swap" rel="stylesheet" />
-    <link rel="preload" href="css/style.css" />
-    <link rel="stylesheet" href="css/style.css" />
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Product+Sans:wght@400;500;700&display=swap" rel="stylesheet">
     <style>
-        .search {
-            position: relative;
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
         }
 
+        :root {
+            --google-blue: #4285f4;
+            --google-red: #ea4335;
+            --google-yellow: #fbbc04;
+            --google-green: #34a853;
+            --purple-accent: #a142f4;
+            --cyan-accent: #24c1e0;
+            --bg-light: #ffffff;
+            --bg-dark: #202124;
+            --text-light: #202124;
+            --text-dark: #e8eaed;
+            --input-light: #ffffff;
+            --input-dark: #303134;
+            --shadow-light: rgba(0, 0, 0, 0.1);
+            --shadow-dark: rgba(0, 0, 0, 0.3);
+        }
+
+        @media (prefers-color-scheme: dark) {
+            :root {
+                --bg: var(--bg-dark);
+                --text: var(--text-dark);
+                --input-bg: var(--input-dark);
+                --shadow: var(--shadow-dark);
+            }
+        }
+
+        @media (prefers-color-scheme: light) {
+            :root {
+                --bg: var(--bg-light);
+                --text: var(--text-light);
+                --input-bg: var(--input-light);
+                --shadow: var(--shadow-light);
+            }
+        }
+
+        body {
+            font-family: 'Product Sans', 'Roboto', 'Arial', sans-serif;
+            background: var(--bg);
+            color: var(--text);
+            min-height: 100vh;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            overflow-x: hidden;
+            position: relative;
+            transition: background 0.3s ease, color 0.3s ease;
+        }
+
+            /* Animated gradient background */
+            body::before {
+                content: '';
+                position: fixed;
+                top: 0;
+                left: 0;
+                width: 100%;
+                height: 100%;
+                background: linear-gradient(135deg, var(--google-blue) 0%, var(--purple-accent) 25%, var(--cyan-accent) 50%, var(--google-green) 75%, var(--google-yellow) 100% );
+                opacity: 0.03;
+                z-index: 0;
+                animation: gradientShift 15s ease infinite;
+                background-size: 200% 200%;
+            }
+
+        @keyframes gradientShift {
+            0%, 100% {
+                background-position: 0% 50%;
+            }
+
+            50% {
+                background-position: 100% 50%;
+            }
+        }
+
+        /* Particles canvas */
+        #particles {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            z-index: 1;
+            pointer-events: none;
+        }
+
+        .container {
+            position: relative;
+            z-index: 10;
+            width: 100%;
+            max-width: 600px;
+            padding: 20px;
+            animation: fadeIn 0.8s ease-out;
+        }
+
+        @keyframes fadeIn {
+            from {
+                opacity: 0;
+                transform: translateY(30px);
+            }
+
+            to {
+                opacity: 1;
+                transform: translateY(0);
+            }
+        }
+
+        /* Logo */
+        .logo {
+            text-align: center;
+            margin-bottom: 30px;
+            animation: logoAppear 1s ease-out;
+        }
+
+        @keyframes logoAppear {
+            0% {
+                opacity: 0;
+                transform: scale(0.8) translateY(-20px);
+            }
+
+            100% {
+                opacity: 1;
+                transform: scale(1) translateY(0);
+            }
+        }
+
+        .logo h1 {
+            font-size: clamp(3rem, 10vw, 5rem);
+            font-weight: 400;
+            letter-spacing: -2px;
+            display: inline-block;
+        }
+
+        .logo span {
+            display: inline-block;
+            animation: letterBounce 0.6s ease-out both;
+        }
+
+            .logo span:nth-child(1) {
+                color: var(--google-blue);
+                animation-delay: 0.1s;
+            }
+
+            .logo span:nth-child(2) {
+                color: var(--google-red);
+                animation-delay: 0.2s;
+            }
+
+            .logo span:nth-child(3) {
+                color: var(--google-yellow);
+                animation-delay: 0.3s;
+            }
+
+            .logo span:nth-child(4) {
+                color: var(--google-blue);
+                animation-delay: 0.4s;
+            }
+
+            .logo span:nth-child(5) {
+                color: var(--google-green);
+                animation-delay: 0.5s;
+            }
+
+            .logo span:nth-child(6) {
+                color: var(--google-red);
+                animation-delay: 0.6s;
+            }
+
+            .logo span:nth-child(7) {
+                color: var(--purple-accent);
+                animation-delay: 0.7s;
+            }
+
+            .logo span:nth-child(8) {
+                color: var(--cyan-accent);
+                animation-delay: 0.8s;
+            }
+
+        @keyframes letterBounce {
+            0% {
+                opacity: 0;
+                transform: translateY(-30px) rotate(-5deg);
+            }
+
+            60% {
+                transform: translateY(5px) rotate(2deg);
+            }
+
+            100% {
+                opacity: 1;
+                transform: translateY(0) rotate(0);
+            }
+        }
+
+        /* Search box */
+        .search-box {
+            position: relative;
+            margin-bottom: 30px;
+            animation: searchAppear 1s ease-out 0.3s both;
+        }
+
+        @keyframes searchAppear {
+            from {
+                opacity: 0;
+                transform: scale(0.9);
+            }
+
+            to {
+                opacity: 1;
+                transform: scale(1);
+            }
+        }
+
+        .search-container {
+            position: relative;
+            background: var(--input-bg);
+            border-radius: 24px;
+            box-shadow: 0 1px 6px var(--shadow);
+            transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+            overflow: hidden;
+        }
+
+            .search-container::before {
+                content: '';
+                position: absolute;
+                top: -2px;
+                left: -2px;
+                right: -2px;
+                bottom: -2px;
+                background: linear-gradient(135deg, var(--google-blue), var(--purple-accent), var(--cyan-accent));
+                border-radius: 24px;
+                opacity: 0;
+                transition: opacity 0.3s ease;
+                z-index: -1;
+            }
+
+            .search-container:focus-within {
+                box-shadow: 0 4px 20px rgba(66, 133, 244, 0.3);
+                transform: translateY(-2px);
+            }
+
+                .search-container:focus-within::before {
+                    opacity: 0.15;
+                }
+
+        .search-input-wrapper {
+            display: flex;
+            align-items: center;
+            padding: 0 20px;
+        }
+
+        .search-icon {
+            color: #9aa0a6;
+            margin-right: 12px;
+            font-size: 20px;
+            transition: color 0.3s ease;
+        }
+
+        .search-container:focus-within .search-icon {
+            color: var(--google-blue);
+        }
+
+        input[type="text"] {
+            flex: 1;
+            border: none;
+            outline: none;
+            padding: 14px 0;
+            font-size: 16px;
+            background: transparent;
+            color: var(--text);
+            font-family: inherit;
+        }
+
+            input[type="text"]::placeholder {
+                color: #9aa0a6;
+            }
+
+        .voice-icon {
+            cursor: pointer;
+            padding: 8px;
+            border-radius: 50%;
+            transition: all 0.3s ease;
+            color: var(--google-blue);
+            font-size: 20px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+        }
+
+            .voice-icon:hover {
+                background: rgba(66, 133, 244, 0.1);
+            }
+
+            .voice-icon.listening {
+                animation: pulse 1.5s ease-in-out infinite;
+                color: var(--google-red);
+            }
+
+        @keyframes pulse {
+            0%, 100% {
+                transform: scale(1);
+            }
+
+            50% {
+                transform: scale(1.2);
+            }
+        }
+
+        /* Suggestions dropdown */
         #suggestions {
             position: absolute;
-            background: white;
-            border: 1px solid #ddd;
-            border-radius: 4px;
-            max-height: 300px;
+            top: calc(100% + 8px);
+            left: 0;
+            right: 0;
+            background: var(--input-bg);
+            border-radius: 16px;
+            box-shadow: 0 4px 20px var(--shadow);
+            max-height: 400px;
             overflow-y: auto;
             display: none;
-            z-index: 1000;
-            box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
-            width: min(90vw, 500px);
-            top: 100%;
-            left: 0;
-            margin-top: 4px;
+            animation: dropdownAppear 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+        }
+
+        @keyframes dropdownAppear {
+            from {
+                opacity: 0;
+                transform: translateY(-10px);
+            }
+
+            to {
+                opacity: 1;
+                transform: translateY(0);
+            }
+        }
+
+        #suggestions.show {
+            display: block;
         }
 
         .suggestion-item {
-            padding: 10px 15px;
+            padding: 12px 20px;
             cursor: pointer;
-            border-bottom: 1px solid #f0f0f0;
+            transition: all 0.2s ease;
+            display: flex;
+            align-items: center;
+            color: var(--text);
+            border-bottom: 1px solid rgba(128, 128, 128, 0.1);
         }
 
             .suggestion-item:last-child {
                 border-bottom: none;
             }
 
+            .suggestion-item::before {
+                content: '🔍';
+                margin-right: 12px;
+                font-size: 16px;
+            }
+
             .suggestion-item:hover {
-                background-color: #f5f5f5;
+                background: rgba(66, 133, 244, 0.08);
+                padding-left: 24px;
+            }
+
+        /* Buttons */
+        .buttons {
+            display: flex;
+            gap: 12px;
+            justify-content: center;
+            flex-wrap: wrap;
+            animation: buttonsAppear 1s ease-out 0.5s both;
+        }
+
+        @keyframes buttonsAppear {
+            from {
+                opacity: 0;
+                transform: translateY(20px);
+            }
+
+            to {
+                opacity: 1;
+                transform: translateY(0);
+            }
+        }
+
+        button {
+            padding: 12px 24px;
+            border: none;
+            border-radius: 8px;
+            font-size: 14px;
+            font-family: inherit;
+            font-weight: 500;
+            cursor: pointer;
+            transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+            background: var(--input-bg);
+            color: var(--text);
+            box-shadow: 0 1px 3px var(--shadow);
+            position: relative;
+            overflow: hidden;
+        }
+
+            button::before {
+                content: '';
+                position: absolute;
+                top: 50%;
+                left: 50%;
+                width: 0;
+                height: 0;
+                border-radius: 50%;
+                background: rgba(66, 133, 244, 0.3);
+                transform: translate(-50%, -50%);
+                transition: width 0.6s, height 0.6s;
+            }
+
+            button:active::before {
+                width: 300px;
+                height: 300px;
+            }
+
+            button:hover {
+                box-shadow: 0 4px 12px var(--shadow);
+                transform: translateY(-2px);
+            }
+
+        .lucky-btn {
+            background: linear-gradient(135deg, var(--google-blue), var(--purple-accent));
+            color: white;
+        }
+
+        /* Footer */
+        footer {
+            position: fixed;
+            bottom: 20px;
+            text-align: center;
+            font-size: 13px;
+            color: #9aa0a6;
+            animation: fadeIn 1s ease-out 1s both;
+        }
+
+        /* Responsive */
+        @media (max-width: 640px) {
+            .logo h1 {
+                font-size: 3rem;
+            }
+
+            .container {
+                padding: 20px 16px;
+            }
+
+            button {
+                font-size: 13px;
+                padding: 10px 20px;
+            }
+        }
+
+        /* Scrollbar */
+        ::-webkit-scrollbar {
+            width: 8px;
+        }
+
+        ::-webkit-scrollbar-track {
+            background: transparent;
+        }
+
+        ::-webkit-scrollbar-thumb {
+            background: rgba(128, 128, 128, 0.3);
+            border-radius: 4px;
+        }
+
+            ::-webkit-scrollbar-thumb:hover {
+                background: rgba(128, 128, 128, 0.5);
             }
     </style>
-    <script>
-        document.addEventListener('DOMContentLoaded', () => {
-            const input = document.querySelector('input[name="q"]');
-            const form = document.querySelector('form');
-            const searchContainer = document.querySelector('.search');
-            let suggestionsDiv = document.createElement('div');
-            suggestionsDiv.id = 'suggestions';
-            searchContainer.appendChild(suggestionsDiv);
-
-            let debounceTimer;
-
-            input.addEventListener('input', (e) => {
-                clearTimeout(debounceTimer);
-
-                const fullQuery = e.target.value;
-                const words = fullQuery.split(' ');
-                const lastWord = words[words.length - 1].trim();
-
-                if (lastWord.length < 2) {
-                    suggestionsDiv.style.display = 'none';
-                    return;
-                }
-
-                debounceTimer = setTimeout(async () => {
-                    try {
-                        const response = await fetch('/predict?q=' + encodeURIComponent(lastWord));
-                        const suggestions = await response.json();
-
-                        if (suggestions.length > 0) {
-                            suggestionsDiv.innerHTML = '';
-                            suggestions.forEach(suggestion => {
-                                const div = document.createElement('div');
-                                div.className = 'suggestion-item';
-                                div.textContent = suggestion;
-                                div.onclick = () => {
-                                    words[words.length - 1] = suggestion;
-                                    input.value = words.join(' ') + ' ';
-                                    suggestionsDiv.style.display = 'none';
-                                    input.focus();
-                                };
-                                suggestionsDiv.appendChild(div);
-                            });
-                            suggestionsDiv.style.display = 'block';
-                        } else {
-                            suggestionsDiv.style.display = 'none';
-                        }
-                    } catch (error) {
-                        console.error('Error fetching suggestions:', error);
-                    }
-                }, 300);
-            });
-
-            document.addEventListener('click', (e) => {
-                if (e.target !== input && !suggestionsDiv.contains(e.target)) {
-                    suggestionsDiv.style.display = 'none';
-                }
-            });
-        });
-    </script>
 </head>
-
 <body>
-    <article class="edaoogle">
-        <div class="title">EDAoogle</div>
-        <div class="search">
+    <canvas id="particles"></canvas>
+
+    <!-- Overlay to block interactions when suggestions are open -->
+    <div id="suggestions-overlay"></div>
+
+    <div class="container">
+        <div class="logo">
+            <h1>
+                <span>E</span><span>D</span><span>A</span><span>o</span><span>o</span><span>g</span><span>l</span><span>e</span>
+            </h1>
+        </div>
+
+        <div class="search-box">
             <form action="/search" method="get">
-                <input type="text" name="q" autofocus>
-                <button type="submit" class="search-btn">Buscar</button>
+                <div class="search-container">
+                    <div class="search-input-wrapper">
+                        <span class="search-icon">🔍</span>
+                        <input type="text" name="q" autocomplete="off" placeholder="Buscar en EDAoogle..." autofocus>
+                        <div class="voice-icon" id="voiceBtn" title="Búsqueda por voz">🎤</div>
+                    </div>
+                </div>
+                <div id="suggestions"></div>
             </form>
         </div>
-    </article>
-</body>
 
+        <div class="buttons">
+            <button type="submit" onclick="document.querySelector('form').submit()">Buscar con EDAoogle</button>
+            <button type="button" class="lucky-btn" onclick="luckySearch()">Voy a tener suerte</button>
+        </div>
+    </div>
+
+    <footer>
+        EDAoogle - Powered by libmicrohttpd + SQLite + ❤️
+    </footer>
+
+    <script>
+        // Particles animation
+        const canvas = document.getElementById('particles');
+        const ctx = canvas.getContext('2d');
+        canvas.width = window.innerWidth;
+        canvas.height = window.innerHeight;
+
+        const particles = [];
+        const particleCount = 50;
+
+        class Particle {
+            constructor() {
+                this.x = Math.random() * canvas.width;
+                this.y = Math.random() * canvas.height;
+                this.size = Math.random() * 3 + 1;
+                this.speedX = Math.random() * 0.5 - 0.25;
+                this.speedY = Math.random() * 0.5 - 0.25;
+                this.opacity = Math.random() * 0.5;
+            }
+
+            update() {
+                this.x += this.speedX;
+                this.y += this.speedY;
+
+                if (this.x > canvas.width) this.x = 0;
+                if (this.x < 0) this.x = canvas.width;
+                if (this.y > canvas.height) this.y = 0;
+                if (this.y < 0) this.y = canvas.height;
+            }
+
+            draw() {
+                ctx.fillStyle = `rgba(66, 133, 244, ${this.opacity})`;
+                ctx.beginPath();
+                ctx.arc(this.x, this.y, this.size, 0, Math.PI * 2);
+                ctx.fill();
+            }
+        }
+
+        for (let i = 0; i < particleCount; i++) {
+            particles.push(new Particle());
+        }
+
+        function animate() {
+            ctx.clearRect(0, 0, canvas.width, canvas.height);
+            particles.forEach(particle => {
+                particle.update();
+                particle.draw();
+            });
+            requestAnimationFrame(animate);
+        }
+
+        animate();
+
+        window.addEventListener('resize', () => {
+            canvas.width = window.innerWidth;
+            canvas.height = window.innerHeight;
+        });
+
+        // Autocomplete functionality
+        const input = document.querySelector('input[name="q"]');
+        const suggestionsDiv = document.getElementById('suggestions');
+        const suggestionsOverlay = document.getElementById('suggestions-overlay');
+        let debounceTimer;
+
+        input.addEventListener('input', (e) => {
+            clearTimeout(debounceTimer);
+
+            const fullQuery = e.target.value;
+            const words = fullQuery.split(' ');
+            const lastWord = words[words.length - 1].trim();
+
+            if (lastWord.length < 2) {
+                suggestionsDiv.classList.remove('show');
+                suggestionsOverlay.classList.remove('show');
+                return;
+            }
+
+            debounceTimer = setTimeout(async () => {
+                try {
+                    const response = await fetch('/predict?q=' + encodeURIComponent(lastWord));
+                    const suggestions = await response.json();
+
+                    if (suggestions.length > 0) {
+                        suggestionsDiv.innerHTML = '';
+                        suggestions.forEach((suggestion, index) => {
+                            const div = document.createElement('div');
+                            div.className = 'suggestion-item';
+                            div.textContent = suggestion;
+                            div.style.animationDelay = `${index * 0.05}s`;
+                            div.onclick = () => {
+                                words[words.length - 1] = suggestion;
+                                input.value = words.join(' ') + ' ';
+                                suggestionsDiv.classList.remove('show');
+                                suggestionsOverlay.classList.remove('show');
+                                input.focus();
+                            };
+                            suggestionsDiv.appendChild(div);
+                        });
+                        suggestionsDiv.classList.add('show');
+                        suggestionsOverlay.classList.add('show');
+                    } else {
+                        suggestionsDiv.classList.remove('show');
+                        suggestionsOverlay.classList.remove('show');
+                    }
+                } catch (error) {
+                    console.error('Error fetching suggestions:', error);
+                }
+            }, 300);
+        });
+
+        // Close suggestions when clicking outside or on overlay
+        document.addEventListener('click', (e) => {
+            if (e.target !== input && !suggestionsDiv.contains(e.target)) {
+                suggestionsDiv.classList.remove('show');
+                suggestionsOverlay.classList.remove('show');
+            }
+        });
+
+        suggestionsOverlay.addEventListener('click', () => {
+            suggestionsDiv.classList.remove('show');
+            suggestionsOverlay.classList.remove('show');
+        });
+
+        // Voice search simulation
+        const voiceBtn = document.getElementById('voiceBtn');
+        voiceBtn.addEventListener('click', () => {
+            voiceBtn.classList.add('listening');
+            setTimeout(() => {
+                voiceBtn.classList.remove('listening');
+                input.value = 'Búsqueda por voz simulada';
+                input.focus();
+            }, 2000);
+        });
+
+        // Lucky search - gets a random entry from database
+        async function luckySearch() {
+            try {
+                // Show loading state
+                const luckyBtn = document.querySelector('.lucky-btn');
+                const originalText = luckyBtn.textContent;
+                luckyBtn.textContent = '🍀 Buscando...';
+                luckyBtn.disabled = true;
+
+                // Fetch random entry from backend
+                const response = await fetch('/lucky');
+                const data = await response.json();
+
+                if (data.success && data.path) {
+                    // Redirect directly to the random page
+                    window.location.href = data.path;
+                } else {
+                    // Fallback: do a random search
+                    const queries = ['ABBA', 'wikipedia', 'tecnología', 'música', 'ciencia'];
+                    const randomQuery = queries[Math.floor(Math.random() * queries.length)];
+                    input.value = randomQuery;
+                    document.querySelector('form').submit();
+                }
+            } catch (error) {
+                console.error('Lucky search error:', error);
+                // Fallback on error
+                const queries = ['ABBA', 'wikipedia', 'tecnología', 'música', 'ciencia'];
+                const randomQuery = queries[Math.floor(Math.random() * queries.length)];
+                input.value = randomQuery;
+                document.querySelector('form').submit();
+            }
+        }
+
+        // Keyboard shortcuts
+        document.addEventListener('keydown', (e) => {
+            if (e.key === 'Escape') {
+                suggestionsDiv.classList.remove('show');
+                suggestionsOverlay.classList.remove('show');
+            }
+        });
+    </script>
+</body>
 </html>

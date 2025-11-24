@@ -392,6 +392,55 @@ string cleanUrl(const string& url) {
 bool HttpRequestHandler::handleRequest(string url,
     HttpArguments arguments,
     vector<char>& response) {
+
+    //=============== LUCKY HANDLER (FAST VERSION) ===============//
+    string luckyPage = "/lucky";
+    if (url == luckyPage) {
+        cout << "Lucky search request received" << endl;
+
+        if (!database) {
+            string jsonResponse = "{\"success\": false, \"error\": \"Database not available\"}";
+            response.assign(jsonResponse.begin(), jsonResponse.end());
+            return true;
+        }
+
+        // Fast method: uses rowid for efficient random selection
+        sqlite3_stmt* stmt;
+        string sql = string("SELECT path FROM ") + tableName +
+            " WHERE rowid >= (ABS(RANDOM()) % (SELECT MAX(rowid) FROM " +
+            tableName + ")) LIMIT 1;";
+
+        if (sqlite3_prepare_v2(database, sql.c_str(), -1, &stmt, NULL) != SQLITE_OK) {
+            cerr << "Failed to prepare lucky statement: " << sqlite3_errmsg(database) << endl;
+            string jsonResponse = "{\"success\": false, \"error\": \"Query failed\"}";
+            response.assign(jsonResponse.begin(), jsonResponse.end());
+            return true;
+        }
+
+        string randomPath = "";
+        if (sqlite3_step(stmt) == SQLITE_ROW) {
+            const char* path = (const char*)sqlite3_column_text(stmt, 0);
+            if (path) {
+                randomPath = string(path);
+            }
+        }
+
+        sqlite3_finalize(stmt);
+
+        string jsonResponse;
+        if (!randomPath.empty()) {
+            cout << "Lucky search found: " << randomPath << endl;
+            jsonResponse = "{\"success\": true, \"path\": \"" + randomPath + "\"}";
+        }
+        else {
+            cout << "Lucky search found no results" << endl;
+            jsonResponse = "{\"success\": false, \"error\": \"No entries found\"}";
+        }
+
+        response.assign(jsonResponse.begin(), jsonResponse.end());
+        return true;
+    }
+
     //=============== PREDICT HANDLER ===============//
     string predictPage = "/predict";
     if (url.substr(0, predictPage.size()) == predictPage) {
@@ -688,10 +737,13 @@ bool HttpRequestHandler::handleRequest(string url,
             return true;
         }
 
-        // If no "view" parameter, serve the file directly (falls through to serve())
     }
 
-    //=============== SEARCH HANDLER ===============//
+    // COMPLETE SEARCH RESULTS PAGE
+// Replace in HttpRequestHandler.cpp in the handleRequest() function
+// Starting around line 530 where you see: string searchPage = "/search";
+
+//=============== SEARCH HANDLER ===============//
     string searchPage = "/search";
     if (url.substr(0, searchPage.size()) == searchPage) {
         string searchString;
@@ -699,159 +751,440 @@ bool HttpRequestHandler::handleRequest(string url,
             searchString = arguments["q"];
 
         // HTML Header with autocomplete and enhanced styling
-        string responseString = string(
-            "<!DOCTYPE html>\
-<html>\
-<head>\
-    <meta charset=\"utf-8\" />\
-    <title>EDAoogle - ") + searchString + string("</title>\
-    <link rel=\"preload\" href=\"https://fonts.googleapis.com\" />\
-    <link rel=\"preload\" href=\"https://fonts.gstatic.com\" crossorigin />\
-    <link href=\"https://fonts.googleapis.com/css2?family=Inter:wght@400;600&display=swap\" rel=\"stylesheet\" />\
-    <link rel=\"preload\" href=\"../css/style.css\" />\
-    <link rel=\"stylesheet\" href=\"../css/style.css\" />\
-    <style>\
-        .search {\
-            position: relative;\
-        }\
-        #suggestions {\
-            position: absolute;\
-            background: white;\
-            border: 1px solid #ddd;\
-            border-radius: 4px;\
-            max-height: 300px;\
-            overflow-y: auto;\
-            display: none;\
-            z-index: 1000;\
-            box-shadow: 0 2px 8px rgba(0,0,0,0.1);\
-            width: min(90vw, 450px);\
-            top: 100%;\
-            left: 0;\
-            margin-top: 4px;\
-        }\
-        .suggestion-item {\
-            padding: 10px 15px;\
-            cursor: pointer;\
-            border-bottom: 1px solid #f0f0f0;\
-        }\
-        .suggestion-item:last-child {\
-            border-bottom: none;\
-        }\
-        .suggestion-item:hover {\
-            background-color: #f5f5f5;\
-        }\
-        .image-result {\
-            display: flex;\
-            align-items: flex-start;\
-            gap: 15px;\
-            margin-bottom: 1.5rem;\
-        }\
-        .image-thumbnail {\
-            flex-shrink: 0;\
-        }\
-        .image-thumbnail img {\
-            max-width: 200px;\
-            max-height: 200px;\
-            border-radius: 4px;\
-            box-shadow: 0 1px 3px rgba(0,0,0,0.1);\
-        }\
-        .image-details {\
-            flex: 1;\
-        }\
-    </style>\
-    <script>\
-        document.addEventListener('DOMContentLoaded', () => {\
-            const input = document.querySelector('input[name=\"q\"]');\
-            const form = document.querySelector('form');\
-            const searchContainer = document.querySelector('.search');\
-            let suggestionsDiv = document.createElement('div');\
-            suggestionsDiv.id = 'suggestions';\
-            searchContainer.appendChild(suggestionsDiv);\
-            \
-            let debounceTimer;\
-            \
-            input.addEventListener('input', (e) => {\
-                clearTimeout(debounceTimer);\
-                \
-                const fullQuery = e.target.value;\
-                const words = fullQuery.split(' ');\
-                const lastWord = words[words.length - 1].trim();\
-                \
-                if (lastWord.length < 2) {\
-                    suggestionsDiv.style.display = 'none';\
-                    return;\
-                }\
-                \
-                debounceTimer = setTimeout(async () => {\
-                    try {\
-                        const response = await fetch('/predict?q=' + encodeURIComponent(lastWord));\
-                        const suggestions = await response.json();\
-                        \
-                        if (suggestions.length > 0) {\
-                            suggestionsDiv.innerHTML = '';\
-                            suggestions.forEach(suggestion => {\
-                                const div = document.createElement('div');\
-                                div.className = 'suggestion-item';\
-                                div.textContent = suggestion;\
-                                div.onclick = () => {\
-                                    words[words.length - 1] = suggestion;\
-                                    input.value = words.join(' ') + ' ';\
-                                    suggestionsDiv.style.display = 'none';\
-                                    input.focus();\
-                                };\
-                                suggestionsDiv.appendChild(div);\
-                            });\
-                            suggestionsDiv.style.display = 'block';\
-                        } else {\
-                            suggestionsDiv.style.display = 'none';\
-                        }\
-                    } catch (error) {\
-                        console.error('Error fetching suggestions:', error);\
-                    }\
-                }, 300);\
-            });\
-            \
-            document.addEventListener('click', (e) => {\
-                if (e.target !== input && !suggestionsDiv.contains(e.target)) {\
-                    suggestionsDiv.style.display = 'none';\
-                }\
-            });\
-        });\
-    </script>\
-</head>\
-\
-<body>\
-    <article class=\"edaoogle results-page\">\
-        <div class=\"title\"><a href=\"/\">EDAoogle</a></div>\
-        <div class=\"search\">\
-            <form action=\"/search\" method=\"get\">\
-                <input type=\"text\" name=\"q\" value=\"") +
-            searchString +
-            string("\" autofocus>\
-                <button type=\"submit\" class=\"search-btn\">Buscar</button>\
-            </form>\
-        </div>\
-    </article>");
+        string responseString = R"(<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>)" + searchString + R"( - EDAoogle</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Product+Sans:wght@400;500;700&display=swap" rel="stylesheet">
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
 
-        // Starts timer
+        :root {
+            --google-blue: #4285f4;
+            --google-red: #ea4335;
+            --google-green: #34a853;
+            --purple-accent: #a142f4;
+            --bg-light: #ffffff;
+            --bg-dark: #202124;
+            --text-light: #202124;
+            --text-dark: #e8eaed;
+            --input-light: #ffffff;
+            --input-dark: #303134;
+            --shadow-light: rgba(0, 0, 0, 0.1);
+            --shadow-dark: rgba(0, 0, 0, 0.3);
+        }
+
+        @media (prefers-color-scheme: dark) {
+            :root {
+                --bg: var(--bg-dark);
+                --text: var(--text-dark);
+                --input-bg: var(--input-dark);
+                --shadow: var(--shadow-dark);
+            }
+        }
+
+        @media (prefers-color-scheme: light) {
+            :root {
+                --bg: var(--bg-light);
+                --text: var(--text-light);
+                --input-bg: var(--input-light);
+                --shadow: var(--shadow-light);
+            }
+        }
+
+        body {
+            font-family: 'Product Sans', 'Roboto', 'Arial', sans-serif;
+            background: var(--bg);
+            color: var(--text);
+            min-height: 100vh;
+            transition: background 0.3s ease, color 0.3s ease;
+        }
+
+        header {
+            position: sticky;
+            top: 0;
+            background: var(--bg);
+            border-bottom: 1px solid rgba(128, 128, 128, 0.1);
+            padding: 16px 24px;
+            display: flex;
+            align-items: center;
+            gap: 32px;
+            z-index: 100;
+            box-shadow: 0 1px 6px var(--shadow);
+            backdrop-filter: blur(10px);
+            animation: slideDown 0.4s ease-out;
+        }
+
+        @keyframes slideDown {
+            from {
+                transform: translateY(-100%);
+                opacity: 0;
+            }
+            to {
+                transform: translateY(0);
+                opacity: 1;
+            }
+        }
+
+        .logo-small {
+            font-size: 24px;
+            font-weight: 400;
+            text-decoration: none;
+            letter-spacing: -1px;
+            transition: transform 0.3s ease;
+            white-space: nowrap;
+        }
+
+        .logo-small:hover {
+            transform: scale(1.05);
+        }
+
+        .logo-small span:nth-child(1) { color: var(--google-blue); }
+        .logo-small span:nth-child(2) { color: var(--google-red); }
+        .logo-small span:nth-child(3) { color: #fbbc04; }
+        .logo-small span:nth-child(4) { color: var(--google-blue); }
+        .logo-small span:nth-child(5) { color: var(--google-green); }
+        .logo-small span:nth-child(6) { color: var(--google-red); }
+        .logo-small span:nth-child(7) { color: var(--purple-accent); }
+        .logo-small span:nth-child(8) { color: #24c1e0; }
+
+        .search-header {
+            flex: 1;
+            max-width: 600px;
+            position: relative;
+        }
+
+        .search-container {
+            position: relative;
+            background: var(--input-bg);
+            border-radius: 24px;
+            box-shadow: 0 1px 6px var(--shadow);
+            transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+        }
+
+        .search-container:focus-within {
+            box-shadow: 0 4px 20px rgba(66, 133, 244, 0.3);
+        }
+
+        .search-input-wrapper {
+            display: flex;
+            align-items: center;
+            padding: 0 16px;
+        }
+
+        .search-icon {
+            color: #9aa0a6;
+            margin-right: 12px;
+            font-size: 18px;
+        }
+
+        input[type="text"] {
+            flex: 1;
+            border: none;
+            outline: none;
+            padding: 10px 0;
+            font-size: 16px;
+            background: transparent;
+            color: var(--text);
+            font-family: inherit;
+        }
+
+        button[type="submit"] {
+            padding: 8px 16px;
+            border: none;
+            border-radius: 8px;
+            font-size: 14px;
+            font-family: inherit;
+            font-weight: 500;
+            cursor: pointer;
+            background: var(--google-blue);
+            color: white;
+            transition: all 0.3s ease;
+            margin-left: 12px;
+        }
+
+        button[type="submit"]:hover {
+            background: #1a73e8;
+            transform: scale(1.05);
+        }
+
+        #suggestions {
+            position: absolute;
+            top: calc(100% + 8px);
+            left: 0;
+            right: 0;
+            background: var(--input-bg);
+            border-radius: 16px;
+            box-shadow: 0 8px 32px var(--shadow);
+            max-height: 400px;
+            overflow-y: auto;
+            display: none;
+            z-index: 10001;
+        }
+
+        #suggestions.show {
+            display: block;
+            animation: dropdownAppear 0.3s ease;
+        }
+
+        @keyframes dropdownAppear {
+            from {
+                opacity: 0;
+                transform: translateY(-10px);
+            }
+            to {
+                opacity: 1;
+                transform: translateY(0);
+            }
+        }
+
+        #suggestions-overlay {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background: transparent;
+            z-index: 10000;
+            display: none;
+        }
+
+        #suggestions-overlay.show {
+            display: block;
+        }
+
+        .suggestion-item {
+            padding: 12px 16px;
+            cursor: pointer;
+            transition: all 0.2s ease;
+            color: var(--text);
+            border-bottom: 1px solid rgba(128, 128, 128, 0.1);
+        }
+
+        .suggestion-item:last-child {
+            border-bottom: none;
+        }
+
+        .suggestion-item::before {
+            content: '🔍';
+            margin-right: 12px;
+            font-size: 16px;
+        }
+
+        .suggestion-item:hover {
+            background: rgba(66, 133, 244, 0.08);
+            padding-left: 20px;
+        }
+
+        main {
+            max-width: 800px;
+            margin: 0 auto;
+            padding: 24px;
+        }
+
+        .results-stats {
+            margin-bottom: 24px;
+            font-size: 14px;
+            color: #70757a;
+            animation: fadeIn 0.5s ease;
+        }
+
+        @keyframes fadeIn {
+            from { opacity: 0; }
+            to { opacity: 1; }
+        }
+
+        .results {
+            display: flex;
+            flex-direction: column;
+            gap: 32px;
+        }
+
+        .result {
+            opacity: 0;
+            animation: resultAppear 0.5s ease forwards;
+            transition: transform 0.3s ease;
+        }
+
+        .result:hover {
+            transform: translateX(8px);
+        }
+
+        @keyframes resultAppear {
+            from {
+                opacity: 0;
+                transform: translateY(20px);
+            }
+            to {
+                opacity: 1;
+                transform: translateY(0);
+            }
+        }
+
+        .result:nth-child(1) { animation-delay: 0.1s; }
+        .result:nth-child(2) { animation-delay: 0.15s; }
+        .result:nth-child(3) { animation-delay: 0.2s; }
+        .result:nth-child(4) { animation-delay: 0.25s; }
+        .result:nth-child(5) { animation-delay: 0.3s; }
+        .result:nth-child(6) { animation-delay: 0.35s; }
+        .result:nth-child(7) { animation-delay: 0.4s; }
+        .result:nth-child(8) { animation-delay: 0.45s; }
+        .result:nth-child(9) { animation-delay: 0.5s; }
+        .result:nth-child(10) { animation-delay: 0.55s; }
+
+        .url {
+            font-size: 14px;
+            color: #006621;
+            margin-bottom: 4px;
+            display: flex;
+            align-items: center;
+            gap: 8px;
+        }
+
+        .url::before {
+            content: '🌐';
+            font-size: 16px;
+        }
+
+        .title {
+            display: inline-block;
+            font-size: 20px;
+            color: var(--google-blue);
+            text-decoration: none;
+            margin-bottom: 4px;
+            transition: color 0.2s ease;
+            font-weight: 400;
+        }
+
+        .title:hover {
+            text-decoration: underline;
+            color: #1a73e8;
+        }
+
+        .snippet {
+            font-size: 14px;
+            color: #4d5156;
+            line-height: 1.6;
+        }
+
+        .image-result {
+            display: flex;
+            gap: 16px;
+            align-items: flex-start;
+        }
+
+        .image-thumbnail {
+            flex-shrink: 0;
+            border-radius: 12px;
+            overflow: hidden;
+            box-shadow: 0 2px 8px var(--shadow);
+            transition: all 0.3s ease;
+        }
+
+        .image-thumbnail:hover {
+            transform: scale(1.05);
+            box-shadow: 0 4px 16px var(--shadow);
+        }
+
+        .image-thumbnail img {
+            width: 200px;
+            height: 200px;
+            object-fit: cover;
+            display: block;
+        }
+
+        .image-details {
+            flex: 1;
+        }
+
+        @media (max-width: 768px) {
+            header {
+                flex-direction: column;
+                gap: 16px;
+                padding: 12px 16px;
+            }
+
+            .search-header {
+                width: 100%;
+            }
+
+            main {
+                padding: 16px;
+            }
+
+            .image-result {
+                flex-direction: column;
+            }
+
+            .image-thumbnail img {
+                width: 100%;
+                height: auto;
+            }
+        }
+
+        ::-webkit-scrollbar {
+            width: 8px;
+        }
+
+        ::-webkit-scrollbar-track {
+            background: transparent;
+        }
+
+        ::-webkit-scrollbar-thumb {
+            background: rgba(128, 128, 128, 0.3);
+            border-radius: 4px;
+        }
+
+        ::-webkit-scrollbar-thumb:hover {
+            background: rgba(128, 128, 128, 0.5);
+        }
+    </style>
+</head>
+<body>
+    <div id="suggestions-overlay"></div>
+    
+    <header>
+        <a href="/" class="logo-small">
+            <span>E</span><span>D</span><span>A</span><span>o</span><span>o</span><span>g</span><span>l</span><span>e</span>
+        </a>
+        
+        <div class="search-header">
+            <form action="/search" method="get">
+                <div class="search-container">
+                    <div class="search-input-wrapper">
+                        <span class="search-icon">🔍</span>
+                        <input type="text" name="q" value=")" + searchString + R"(" autocomplete="off" autofocus>
+                        <button type="submit">Buscar</button>
+                    </div>
+                </div>
+                <div id="suggestions"></div>
+            </form>
+        </div>
+    </header>
+
+    <main>)";
+
+        // Start timer
         auto startTime = chrono::high_resolution_clock::now();
-
         float searchTime = 0.0F;
-        // Structure to store path and snippet together
         vector<pair<string, string>> results;
 
         if (!searchString.empty() && database) {
-            // Pointer for read statement
             sqlite3_stmt* stmt;
-            // Statement structure - now selecting both path and snippet
             string sql = string("SELECT path, snippet FROM ") + tableName + " WHERE " + tableName +
                 " MATCH ? LIMIT 100;";
 
-            // Compiles SQL statement
             if (sqlite3_prepare_v2(database, sql.c_str(), -1, &stmt, NULL) == SQLITE_OK) {
                 sqlite3_bind_text(stmt, 1, searchString.c_str(), -1, SQLITE_TRANSIENT);
 
-                // Iterates through results
                 while (sqlite3_step(stmt) == SQLITE_ROW) {
                     const char* path = (const char*)sqlite3_column_text(stmt, 0);
                     const char* snippet = (const char*)sqlite3_column_text(stmt, 1);
@@ -866,25 +1199,25 @@ bool HttpRequestHandler::handleRequest(string url,
             }
         }
 
-        // Stops timer
+        // Stop timer
         auto endTime = chrono::high_resolution_clock::now();
         searchTime = chrono::duration<float>(endTime - startTime).count();
 
         // Print search results count
+        responseString += "<div class=\"results-stats\">Aproximadamente " + to_string(results.size()) +
+            " resultados (" + to_string(searchTime) + " segundos)</div>";
+
         responseString += "<div class=\"results\">";
-        responseString += "<div class=\"results-stats\">" + to_string(results.size()) +
-            " results (" + to_string(searchTime) + " seconds)</div>";
 
         for (auto& result : results) {
             string path = result.first;
             string precomputedSnippet = result.second;
 
-            // Extracts display name from path
+            // Extract display name from path
             size_t lastSlash = path.find_last_of('/');
-            string displayName =
-                (lastSlash != string::npos) ? path.substr(lastSlash + 1) : path;
+            string displayName = (lastSlash != string::npos) ? path.substr(lastSlash + 1) : path;
 
-            // Removes extension
+            // Remove extension
             size_t lastDot = displayName.find_last_of('.');
             if (lastDot != string::npos) {
                 displayName = displayName.substr(0, lastDot);
@@ -893,16 +1226,14 @@ bool HttpRequestHandler::handleRequest(string url,
             // Clean title for display
             string cleanedTitle = cleanTitle(displayName);
 
-            // Use precomputed snippet if available, otherwise generate it
+            // Use precomputed snippet if available
             string snippet;
             if (!precomputedSnippet.empty()) {
                 snippet = precomputedSnippet;
             }
             else {
-                // Fallback: generate snippet from file (backward compatibility)
                 filesystem::path fullPath = filesystem::path(homePath) / path.substr(1);
                 snippet = generateSnippet(fullPath.string());
-                // Final fallback if generation fails
                 if (snippet.empty()) {
                     snippet = "Información sobre " + cleanedTitle + ".";
                 }
@@ -913,15 +1244,11 @@ bool HttpRequestHandler::handleRequest(string url,
 
             // Build result HTML based on mode
             if (imagemode) {
-                // IMAGE MODE: Show thumbnail + title + snippet
-                // DO NOT encode the path for filesystem access, only for HTML display
+                // IMAGE MODE
                 string encodedPath = urlEncode(path);
-
                 responseString += "<div class=\"result image-result\">";
                 responseString += "<div class=\"image-thumbnail\">";
-                // Use raw path for href (browser will handle encoding)
-                // Use encoded path for src to ensure special chars work
-                responseString += "<a href=\"" + path + "?view=1\"><img src=\"" + encodedPath + "\" alt=\"" + cleanedTitle + "\" /></a>";
+                responseString += "<a href=\"" + path + "?view=1\"><img src=\"" + encodedPath + "\" alt=\"" + cleanedTitle + "\"></a>";
                 responseString += "</div>";
                 responseString += "<div class=\"image-details\">";
                 responseString += "<div class=\"url\">" + displayUrl + "</div>";
@@ -931,24 +1258,107 @@ bool HttpRequestHandler::handleRequest(string url,
                 responseString += "</div>";
             }
             else {
-                // HTML MODE: Show title link with ?view=1 + snippet
+                // HTML MODE
                 responseString += "<div class=\"result\">";
                 responseString += "<div class=\"url\">" + displayUrl + "</div>";
-                responseString += "<a class=\"title\" href=\"" + path + "?view=1\">" + cleanedTitle + "</a>";
+                responseString += "<a class=\"title\" href=\"" + path + "\">" + cleanedTitle + "</a>";
                 responseString += "<div class=\"snippet\">" + snippet + "</div>";
                 responseString += "</div>";
             }
         }
 
-        responseString += "</div>"; // Close results div
+        responseString += R"(
+        </div>
+    </main>
 
-        // Trailer
-        responseString +=
-            "</body>\
-            s</html>";
-            response.assign(responseString.begin(), responseString.end());
+    <script>
+        const input = document.querySelector('input[name="q"]');
+        const suggestionsDiv = document.getElementById('suggestions');
+        const suggestionsOverlay = document.getElementById('suggestions-overlay');
+        let debounceTimer;
 
-            return true;
+        input.addEventListener('input', (e) => {
+            clearTimeout(debounceTimer);
+            const fullQuery = e.target.value;
+            const words = fullQuery.split(' ');
+            const lastWord = words[words.length - 1].trim();
+
+            if (lastWord.length < 2) {
+                suggestionsDiv.classList.remove('show');
+                suggestionsOverlay.classList.remove('show');
+                return;
+            }
+
+            debounceTimer = setTimeout(async () => {
+                try {
+                    const response = await fetch('/predict?q=' + encodeURIComponent(lastWord));
+                    const suggestions = await response.json();
+
+                    if (suggestions.length > 0) {
+                        suggestionsDiv.innerHTML = '';
+                        suggestions.forEach(suggestion => {
+                            const div = document.createElement('div');
+                            div.className = 'suggestion-item';
+                            div.textContent = suggestion;
+                            div.onclick = () => {
+                                words[words.length - 1] = suggestion;
+                                input.value = words.join(' ') + ' ';
+                                suggestionsDiv.classList.remove('show');
+                                suggestionsOverlay.classList.remove('show');
+                                input.focus();
+                            };
+                            suggestionsDiv.appendChild(div);
+                        });
+                        suggestionsDiv.classList.add('show');
+                        suggestionsOverlay.classList.add('show');
+                    } else {
+                        suggestionsDiv.classList.remove('show');
+                        suggestionsOverlay.classList.remove('show');
+                    }
+                } catch (error) {
+                    console.error('Error:', error);
+                }
+            }, 300);
+        });
+
+        document.addEventListener('click', (e) => {
+            if (e.target !== input && !suggestionsDiv.contains(e.target)) {
+                suggestionsDiv.classList.remove('show');
+                suggestionsOverlay.classList.remove('show');
+            }
+        });
+
+        suggestionsOverlay.addEventListener('click', () => {
+            suggestionsDiv.classList.remove('show');
+            suggestionsOverlay.classList.remove('show');
+        });
+
+        document.addEventListener('keydown', (e) => {
+            if (e.key === 'Escape') {
+                suggestionsDiv.classList.remove('show');
+                suggestionsOverlay.classList.remove('show');
+            }
+        });
+
+        const observer = new IntersectionObserver((entries) => {
+            entries.forEach(entry => {
+                if (entry.isIntersecting) {
+                    entry.target.style.opacity = '1';
+                    entry.target.style.transform = 'translateY(0)';
+                }
+            });
+        }, { threshold: 0.1 });
+
+        document.querySelectorAll('.result').forEach(result => {
+            observer.observe(result);
+        });
+    </script>
+</body>
+</html>
+)";
+
+        response.assign(responseString.begin(), responseString.end());
+        return true;
     }
     else
         return serve(url, response);
