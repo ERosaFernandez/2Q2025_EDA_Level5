@@ -146,10 +146,6 @@ bool HttpRequestHandler::serve(string url, vector<char>& response) {
     // * Builds absolute local path from url
     // * Checks if absolute local path is within home path
 
-    cout << "=== SERVE DEBUG ===" << endl;
-    cout << "Input URL: " << url << endl;
-    cout << "Home path: " << homePath << endl;
-
     auto homeAbsolutePath = filesystem::absolute(homePath);
     cout << "Home absolute: " << homeAbsolutePath << endl;
 
@@ -191,9 +187,6 @@ bool HttpRequestHandler::serve(string url, vector<char>& response) {
 
     response.resize(fileSize);
     file.read(response.data(), fileSize);
-
-    cout << "SUCCESS: Served " << fileSize << " bytes" << endl;
-    cout << "===================" << endl;
 
     return true;
 }
@@ -732,11 +725,10 @@ bool HttpRequestHandler::imageHandler(std::vector<char>& response,
         response.assign(responseString.begin(), responseString.end());
         return true;
     }
-    return false;
+    return serve(url, response);
 }
 
-bool HttpRequestHandler::searchHandler(std::vector<char>& response,
-                                       HttpArguments& arguments){
+bool HttpRequestHandler::searchHandler(std::vector<char>& response, HttpArguments& arguments) {
     string searchString;
     if (arguments.find("q") != arguments.end())
         searchString = arguments["q"];
@@ -1172,13 +1164,8 @@ bool HttpRequestHandler::searchHandler(std::vector<char>& response,
 
     if (!searchString.empty() && database) {
         sqlite3_stmt* stmt;
-#ifdef TEST
-        string sql = string("SELECT path, snippet FROM ") + tableName + " WHERE " + tableName +
-                     " MATCH ? LIMIT 100;";
-#else
         string sql = string("SELECT path, snippet, BM25(") + tableName + ") AS rank " + "FROM " +
                      tableName + " WHERE " + tableName + " MATCH ? ORDER BY rank ASC LIMIT 100;";
-#endif
 
         if (sqlite3_prepare_v2(database, sql.c_str(), -1, &stmt, NULL) == SQLITE_OK) {
             sqlite3_bind_text(stmt, 1, searchString.c_str(), -1, SQLITE_TRANSIENT);
@@ -1202,7 +1189,7 @@ bool HttpRequestHandler::searchHandler(std::vector<char>& response,
     searchTime = chrono::duration<float>(endTime - startTime).count();
 
     // Print search results count
-    responseString += "<div class=\"results-stats\">Aproximadamente " + to_string(results.size()) +
+    responseString += "<div class=\"results-stats\">" + to_string(results.size()) +
                       " resultados (" + to_string(searchTime) + " segundos)</div>";
 
     responseString += "<div class=\"results\">";
@@ -1243,6 +1230,7 @@ bool HttpRequestHandler::searchHandler(std::vector<char>& response,
         if (imagemode) {
             // IMAGE MODE
             string encodedPath = urlEncode(path);
+
             responseString += "<div class=\"result image-result\">";
             responseString += "<div class=\"image-thumbnail\">";
             responseString += "<a href=\"" + path + "?view=1\"><img src=\"" + encodedPath +
@@ -1392,7 +1380,7 @@ bool HttpRequestHandler::handleRequest(string url,
     //=============== SEARCH HANDLER ===============//
     string searchPage = "/search";
     if (url.substr(0, searchPage.size()) == searchPage) {
-    return searchHandler(response, arguments);
+        return searchHandler(response, arguments);
     } else
         return serve(url, response);
 
