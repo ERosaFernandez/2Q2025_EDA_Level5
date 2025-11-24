@@ -19,8 +19,8 @@
 #include <iomanip>
 #include <iostream>
 #include <locale>
-#include <sstream>
 #include <regex>
+#include <sstream>
 
 using namespace std;
 
@@ -36,8 +36,7 @@ HttpRequestHandler::HttpRequestHandler(string homePath, bool imageMode) {
     if (sqlite3_open(dbFile, &database) != SQLITE_OK) {
         cerr << "Error opening database (" << dbFile << "): " << sqlite3_errmsg(database) << endl;
         database = nullptr;
-    }
-    else {
+    } else {
         cout << "Database opened successfully: " << dbFile << endl;
         cout << "Search mode: " << (imageMode ? "IMAGES" : "HTML") << endl;
     }
@@ -47,8 +46,7 @@ HttpRequestHandler::HttpRequestHandler(string homePath, bool imageMode) {
     trie = new Trie();
     if (loadVocabularyIntoTrie()) {
         cout << "Vocabulary loaded successfully." << endl;
-    }
-    else {
+    } else {
         cout << "Failed to load vocabulary." << endl;
     }
 }
@@ -65,11 +63,10 @@ bool HttpRequestHandler::loadVocabularyIntoTrie() {
     // Opens vocabulary database
     if (sqlite3_open(vocabFile, &database_vocab) != SQLITE_OK) {
         cerr << "Error opening Vocabulary (" << vocabFile << "): " << sqlite3_errmsg(database_vocab)
-            << endl;
+             << endl;
         database_vocab = nullptr;
         return false;
-    }
-    else {
+    } else {
         cout << "Vocabulary opened successfully: " << vocabFile << endl;
         cout << "Search mode: " << (this->imagemode ? "IMAGES" : "HTML") << endl;
     }
@@ -96,8 +93,7 @@ bool HttpRequestHandler::loadVocabularyIntoTrie() {
                 if (u_isalpha(c)) {
                     // Builds word character by character
                     word.push_back(u_tolower(c));
-                }
-                else if (word.size() >= 5) {
+                } else if (word.size() >= 5) {
                     // Inserts word into Trie once a non-word character is found
                     trie->insert(word);
                     word.clear();
@@ -135,7 +131,6 @@ HttpRequestHandler::~HttpRequestHandler() {
     delete trie;
     cout << "Trie deleted" << endl;
 }
-
 
 /**
  * @brief Serves a webpage from file
@@ -361,8 +356,7 @@ string cleanTitle(const string& filename) {
         if (capitalizeNext && isalpha(result[i])) {
             result[i] = toupper(result[i]);
             capitalizeNext = false;
-        }
-        else if (result[i] == ' ') {
+        } else if (result[i] == ' ') {
             capitalizeNext = true;
         }
     }
@@ -389,100 +383,89 @@ string cleanUrl(const string& url) {
     return url;
 }
 
-bool HttpRequestHandler::handleRequest(string url,
-    HttpArguments arguments,
-    vector<char>& response) {
+bool HttpRequestHandler::luckyHandler(vector<char>& response) {
+    cout << "Lucky search request received" << endl;
 
-    //=============== LUCKY HANDLER (FAST VERSION) ===============//
-    string luckyPage = "/lucky";
-    if (url == luckyPage) {
-        cout << "Lucky search request received" << endl;
-
-        if (!database) {
-            string jsonResponse = "{\"success\": false, \"error\": \"Database not available\"}";
-            response.assign(jsonResponse.begin(), jsonResponse.end());
-            return true;
-        }
-
-        // Fast method: uses rowid for efficient random selection
-        sqlite3_stmt* stmt;
-        string sql = string("SELECT path FROM ") + tableName +
-            " WHERE rowid >= (ABS(RANDOM()) % (SELECT MAX(rowid) FROM " +
-            tableName + ")) LIMIT 1;";
-
-        if (sqlite3_prepare_v2(database, sql.c_str(), -1, &stmt, NULL) != SQLITE_OK) {
-            cerr << "Failed to prepare lucky statement: " << sqlite3_errmsg(database) << endl;
-            string jsonResponse = "{\"success\": false, \"error\": \"Query failed\"}";
-            response.assign(jsonResponse.begin(), jsonResponse.end());
-            return true;
-        }
-
-        string randomPath = "";
-        if (sqlite3_step(stmt) == SQLITE_ROW) {
-            const char* path = (const char*)sqlite3_column_text(stmt, 0);
-            if (path) {
-                randomPath = string(path);
-            }
-        }
-
-        sqlite3_finalize(stmt);
-
-        string jsonResponse;
-        if (!randomPath.empty()) {
-            cout << "Lucky search found: " << randomPath << endl;
-            jsonResponse = "{\"success\": true, \"path\": \"" + randomPath + "\"}";
-        }
-        else {
-            cout << "Lucky search found no results" << endl;
-            jsonResponse = "{\"success\": false, \"error\": \"No entries found\"}";
-        }
-
+    if (!database) {
+        string jsonResponse = "{\"success\": false, \"error\": \"Database not available\"}";
         response.assign(jsonResponse.begin(), jsonResponse.end());
         return true;
     }
 
-    //=============== PREDICT HANDLER ===============//
-    string predictPage = "/predict";
-    if (url.substr(0, predictPage.size()) == predictPage) {
-        cout << "Predict request received" << endl;
-        string query;
-        if (arguments.find("q") != arguments.end())
-            query = arguments["q"];
-        cout << "Query: " << query << endl;
+    // Fast method: uses rowid for efficient random selection
+    sqlite3_stmt* stmt;
+    string sql = string("SELECT path FROM ") + tableName +
+                 " WHERE rowid >= (ABS(RANDOM()) % (SELECT MAX(rowid) FROM " + tableName +
+                 ")) LIMIT 1;";
 
-        // Clear previous suggestions and collect new ones
-        trie->collectWords.clear();
-        size_t numSuggestions = trie->collectSuggestions(query, 10);
-
-        // Build response
-        string jsonResponse = "[";
-
-        // Converts suggestions to JSON array
-        wstring_convert<codecvt_utf8<char32_t>, char32_t> converter;
-
-        for (size_t i = 0; i < trie->collectWords.size(); i++) {
-            // Converts UTF-32 word back to UTF-8
-            string suggestion = converter.to_bytes(trie->collectWords[i]);
-
-            jsonResponse += "\"" + suggestion + "\"";
-
-            if (i < trie->collectWords.size() - 1) {
-                jsonResponse += ",";
-            }
-        }
-        jsonResponse += "]";
-
-        // Sets response
+    if (sqlite3_prepare_v2(database, sql.c_str(), -1, &stmt, NULL) != SQLITE_OK) {
+        cerr << "Failed to prepare lucky statement: " << sqlite3_errmsg(database) << endl;
+        string jsonResponse = "{\"success\": false, \"error\": \"Query failed\"}";
         response.assign(jsonResponse.begin(), jsonResponse.end());
         return true;
     }
 
-    //=============== HOME PAGE HANDLER ===============//
-    string homePage = "/";
-    if (url == homePage) {
-        // Serves the home page with autocomplete functionality
-        string responseString = string(
-            "<!DOCTYPE html>\
+    string randomPath = "";
+    if (sqlite3_step(stmt) == SQLITE_ROW) {
+        const char* path = (const char*)sqlite3_column_text(stmt, 0);
+        if (path) {
+            randomPath = string(path);
+        }
+    }
+
+    sqlite3_finalize(stmt);
+
+    string jsonResponse;
+    if (!randomPath.empty()) {
+        cout << "Lucky search found: " << randomPath << endl;
+        jsonResponse = "{\"success\": true, \"path\": \"" + randomPath + "\"}";
+    } else {
+        cout << "Lucky search found no results" << endl;
+        jsonResponse = "{\"success\": false, \"error\": \"No entries found\"}";
+    }
+
+    response.assign(jsonResponse.begin(), jsonResponse.end());
+    return true;
+}
+
+bool HttpRequestHandler::predictHandler(std::vector<char>& response, HttpArguments& arguments) {
+    cout << "Predict request received" << endl;
+    string query;
+    if (arguments.find("q") != arguments.end())
+        query = arguments["q"];
+    cout << "Query: " << query << endl;
+
+    // Clear previous suggestions and collect new ones
+    trie->collectWords.clear();
+    size_t numSuggestions = trie->collectSuggestions(query, 10);
+
+    // Build response
+    string jsonResponse = "[";
+
+    // Converts suggestions to JSON array
+    wstring_convert<codecvt_utf8<char32_t>, char32_t> converter;
+
+    for (size_t i = 0; i < trie->collectWords.size(); i++) {
+        // Converts UTF-32 word back to UTF-8
+        string suggestion = converter.to_bytes(trie->collectWords[i]);
+
+        jsonResponse += "\"" + suggestion + "\"";
+
+        if (i < trie->collectWords.size() - 1) {
+            jsonResponse += ",";
+        }
+    }
+    jsonResponse += "]";
+
+    // Sets response
+    response.assign(jsonResponse.begin(), jsonResponse.end());
+    return true;
+}
+
+bool HttpRequestHandler::homePageHandler(std::vector<char>& response) {
+    // Serves the home page with autocomplete functionality
+    string responseString = string(
+        "<!DOCTYPE html>\
 <html>\
 <head>\
     <meta charset=\"utf-8\" />\
@@ -597,52 +580,50 @@ bool HttpRequestHandler::handleRequest(string url,
 </body>\
 </html>");
 
-        response.assign(responseString.begin(), responseString.end());
-        return true;
-    }
+    response.assign(responseString.begin(), responseString.end());
+    return true;
+}
 
-    //=============== IMAGE VIEWER HANDLER ===============//
-    string specialPage = "/special/";
-    if (url.substr(0, specialPage.size()) == specialPage &&
-        (url.find(".png") != string::npos ||
-            url.find(".jpg") != string::npos ||
-            url.find(".jpeg") != string::npos ||
-            url.find(".PNG") != string::npos ||
-            url.find(".JPG") != string::npos ||
-            url.find(".JPEG") != string::npos)) {
+bool HttpRequestHandler::imageHandler(std::vector<char>& response,
+                                      HttpArguments& arguments,
+                                      std::string& url) {
+    // Check if there's a "view" parameter to show the viewer page
+    if (arguments.find("view") != arguments.end()) {
+        // Extract filename from URL (remove query parameters)
+        string cleanUrlStr = url;
+        size_t queryPos = cleanUrlStr.find('?');
+        if (queryPos != string::npos) {
+            cleanUrlStr = cleanUrlStr.substr(0, queryPos);
+        }
 
-        // Check if there's a "view" parameter to show the viewer page
-        if (arguments.find("view") != arguments.end()) {
-            // Extract filename from URL (remove query parameters)
-            string cleanUrlStr = url;
-            size_t queryPos = cleanUrlStr.find('?');
-            if (queryPos != string::npos) {
-                cleanUrlStr = cleanUrlStr.substr(0, queryPos);
-            }
+        size_t lastSlash = cleanUrlStr.find_last_of('/');
+        string filename =
+            (lastSlash != string::npos) ? cleanUrlStr.substr(lastSlash + 1) : cleanUrlStr;
 
-            size_t lastSlash = cleanUrlStr.find_last_of('/');
-            string filename = (lastSlash != string::npos) ? cleanUrlStr.substr(lastSlash + 1) : cleanUrlStr;
+        // Extract title from filename (remove extension)
+        string title = filename;
+        size_t lastDot = title.find_last_of('.');
+        if (lastDot != string::npos) {
+            title = title.substr(0, lastDot);
+        }
 
-            // Extract title from filename (remove extension)
-            string title = filename;
-            size_t lastDot = title.find_last_of('.');
-            if (lastDot != string::npos) {
-                title = title.substr(0, lastDot);
-            }
+        // Clean title for display
+        string cleanedTitle = cleanTitle(title);
 
-            // Clean title for display
-            string cleanedTitle = cleanTitle(title);
+        // URL-encode the clean URL for the image src
+        string encodedImageUrl = urlEncode(cleanUrlStr);
 
-            // URL-encode the clean URL for the image src
-            string encodedImageUrl = urlEncode(cleanUrlStr);
-
-            // Build image viewer page
-            string responseString = string(
+        // Build image viewer page
+        string responseString =
+            string(
                 "<!DOCTYPE html>\
 <html>\
 <head>\
     <meta charset=\"utf-8\" />\
-    <title>") + cleanedTitle + string(" - EDAoogle</title>\
+    <title>") +
+            cleanedTitle +
+            string(
+                " - EDAoogle</title>\
     <link rel=\"preload\" href=\"https://fonts.googleapis.com\" />\
     <link rel=\"preload\" href=\"https://fonts.gstatic.com\" crossorigin />\
     <link href=\"https://fonts.googleapis.com/css2?family=Inter:wght@400;600&display=swap\" rel=\"stylesheet\" />\
@@ -713,50 +694,61 @@ bool HttpRequestHandler::handleRequest(string url,
     <div class=\"image-viewer\">\
         <div class=\"image-header\">\
             <a href=\"/\" class=\"back-link\">← Volver a EDAoogle</a>\
-            <h1 class=\"image-title\">") + cleanedTitle + string("</h1>\
-            <div class=\"image-filename\">") + filename + string("</div>\
+            <h1 class=\"image-title\">") +
+            cleanedTitle +
+            string(
+                "</h1>\
+            <div class=\"image-filename\">") +
+            filename +
+            string(
+                "</div>\
         </div>\
         <div class=\"image-container\">\
-            <img src=\"") + encodedImageUrl + string("\" alt=\"") + cleanedTitle + string("\" onerror=\"this.onerror=null; this.src=''; this.alt='Error: Imagen no encontrada';\" />\
+            <img src=\"") +
+            encodedImageUrl + string("\" alt=\"") + cleanedTitle +
+            string(
+                "\" onerror=\"this.onerror=null; this.src=''; this.alt='Error: Imagen no encontrada';\" />\
         </div>\
         <div class=\"image-info\">\
             <div class=\"info-row\">\
                 <span class=\"info-label\">Nombre del archivo:</span> \
-                <span class=\"info-value\">") + filename + string("</span>\
+                <span class=\"info-value\">") +
+            filename +
+            string(
+                "</span>\
             </div>\
             <div class=\"info-row\">\
                 <span class=\"info-label\">Ubicación:</span> \
-                <span class=\"info-value\">") + cleanUrlStr + string("</span>\
+                <span class=\"info-value\">") +
+            cleanUrlStr +
+            string(
+                "</span>\
             </div>\
         </div>\
     </div>\
 </body>\
 </html>");
 
-            response.assign(responseString.begin(), responseString.end());
-            return true;
-        }
-
+        response.assign(responseString.begin(), responseString.end());
+        return true;
     }
+    return false;
+}
 
-    // COMPLETE SEARCH RESULTS PAGE
-// Replace in HttpRequestHandler.cpp in the handleRequest() function
-// Starting around line 530 where you see: string searchPage = "/search";
+bool HttpRequestHandler::searchHandler(std::vector<char>& response,
+                                       HttpArguments& arguments){
+    string searchString;
+    if (arguments.find("q") != arguments.end())
+        searchString = arguments["q"];
 
-//=============== SEARCH HANDLER ===============//
-    string searchPage = "/search";
-    if (url.substr(0, searchPage.size()) == searchPage) {
-        string searchString;
-        if (arguments.find("q") != arguments.end())
-            searchString = arguments["q"];
-
-        // HTML Header with autocomplete and enhanced styling
-        string responseString = R"(<!DOCTYPE html>
+    // HTML Header with autocomplete and enhanced styling
+    string responseString = R"(<!DOCTYPE html>
 <html lang="es">
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>)" + searchString + R"( - EDAoogle</title>
+    <title>)" + searchString +
+                            R"( - EDAoogle</title>
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
     <link href="https://fonts.googleapis.com/css2?family=Product+Sans:wght@400;500;700&display=swap" rel="stylesheet">
@@ -1150,18 +1142,19 @@ bool HttpRequestHandler::handleRequest(string url,
 </head>
 <body>
     <div id="suggestions-overlay"></div>
-    
+
     <header>
         <a href="/" class="logo-small">
             <span>E</span><span>D</span><span>A</span><span>o</span><span>o</span><span>g</span><span>l</span><span>e</span>
         </a>
-        
+
         <div class="search-header">
             <form action="/search" method="get">
                 <div class="search-container">
                     <div class="search-input-wrapper">
                         <span class="search-icon">🔍</span>
-                        <input type="text" name="q" value=")" + searchString + R"(" autocomplete="off" autofocus>
+                        <input type="text" name="q" value=")" +
+                            searchString + R"(" autocomplete="off" autofocus>
                         <button type="submit">Buscar</button>
                     </div>
                 </div>
@@ -1172,102 +1165,107 @@ bool HttpRequestHandler::handleRequest(string url,
 
     <main>)";
 
-        // Start timer
-        auto startTime = chrono::high_resolution_clock::now();
-        float searchTime = 0.0F;
-        vector<pair<string, string>> results;
+    // Start timer
+    auto startTime = chrono::high_resolution_clock::now();
+    float searchTime = 0.0F;
+    vector<pair<string, string>> results;
 
-        if (!searchString.empty() && database) {
-            sqlite3_stmt* stmt;
-            string sql = string("SELECT path, snippet FROM ") + tableName + " WHERE " + tableName +
-                " MATCH ? LIMIT 100;";
+    if (!searchString.empty() && database) {
+        sqlite3_stmt* stmt;
+#ifdef TEST
+        string sql = string("SELECT path, snippet FROM ") + tableName + " WHERE " + tableName +
+                     " MATCH ? LIMIT 100;";
+#else
+        string sql = string("SELECT path, snippet, BM25(") + tableName + ") AS rank " + "FROM " +
+                     tableName + " WHERE " + tableName + " MATCH ? ORDER BY rank ASC LIMIT 100;";
+#endif
 
-            if (sqlite3_prepare_v2(database, sql.c_str(), -1, &stmt, NULL) == SQLITE_OK) {
-                sqlite3_bind_text(stmt, 1, searchString.c_str(), -1, SQLITE_TRANSIENT);
+        if (sqlite3_prepare_v2(database, sql.c_str(), -1, &stmt, NULL) == SQLITE_OK) {
+            sqlite3_bind_text(stmt, 1, searchString.c_str(), -1, SQLITE_TRANSIENT);
 
-                while (sqlite3_step(stmt) == SQLITE_ROW) {
-                    const char* path = (const char*)sqlite3_column_text(stmt, 0);
-                    const char* snippet = (const char*)sqlite3_column_text(stmt, 1);
+            while (sqlite3_step(stmt) == SQLITE_ROW) {
+                const char* path = (const char*)sqlite3_column_text(stmt, 0);
+                const char* snippet = (const char*)sqlite3_column_text(stmt, 1);
 
-                    if (path) {
-                        string snippetStr = snippet ? string(snippet) : "";
-                        results.push_back(make_pair(string(path), snippetStr));
-                    }
-                }
-
-                sqlite3_finalize(stmt);
-            }
-        }
-
-        // Stop timer
-        auto endTime = chrono::high_resolution_clock::now();
-        searchTime = chrono::duration<float>(endTime - startTime).count();
-
-        // Print search results count
-        responseString += "<div class=\"results-stats\">Aproximadamente " + to_string(results.size()) +
-            " resultados (" + to_string(searchTime) + " segundos)</div>";
-
-        responseString += "<div class=\"results\">";
-
-        for (auto& result : results) {
-            string path = result.first;
-            string precomputedSnippet = result.second;
-
-            // Extract display name from path
-            size_t lastSlash = path.find_last_of('/');
-            string displayName = (lastSlash != string::npos) ? path.substr(lastSlash + 1) : path;
-
-            // Remove extension
-            size_t lastDot = displayName.find_last_of('.');
-            if (lastDot != string::npos) {
-                displayName = displayName.substr(0, lastDot);
-            }
-
-            // Clean title for display
-            string cleanedTitle = cleanTitle(displayName);
-
-            // Use precomputed snippet if available
-            string snippet;
-            if (!precomputedSnippet.empty()) {
-                snippet = precomputedSnippet;
-            }
-            else {
-                filesystem::path fullPath = filesystem::path(homePath) / path.substr(1);
-                snippet = generateSnippet(fullPath.string());
-                if (snippet.empty()) {
-                    snippet = "Información sobre " + cleanedTitle + ".";
+                if (path) {
+                    string snippetStr = snippet ? string(snippet) : "";
+                    results.push_back(make_pair(string(path), snippetStr));
                 }
             }
 
-            // Clean URL for display
-            string displayUrl = cleanUrl(path);
+            sqlite3_finalize(stmt);
+        }
+    }
 
-            // Build result HTML based on mode
-            if (imagemode) {
-                // IMAGE MODE
-                string encodedPath = urlEncode(path);
-                responseString += "<div class=\"result image-result\">";
-                responseString += "<div class=\"image-thumbnail\">";
-                responseString += "<a href=\"" + path + "?view=1\"><img src=\"" + encodedPath + "\" alt=\"" + cleanedTitle + "\"></a>";
-                responseString += "</div>";
-                responseString += "<div class=\"image-details\">";
-                responseString += "<div class=\"url\">" + displayUrl + "</div>";
-                responseString += "<a class=\"title\" href=\"" + path + "?view=1\">" + cleanedTitle + "</a>";
-                responseString += "<div class=\"snippet\">" + snippet + "</div>";
-                responseString += "</div>";
-                responseString += "</div>";
-            }
-            else {
-                // HTML MODE
-                responseString += "<div class=\"result\">";
-                responseString += "<div class=\"url\">" + displayUrl + "</div>";
-                responseString += "<a class=\"title\" href=\"" + path + "\">" + cleanedTitle + "</a>";
-                responseString += "<div class=\"snippet\">" + snippet + "</div>";
-                responseString += "</div>";
+    // Stop timer
+    auto endTime = chrono::high_resolution_clock::now();
+    searchTime = chrono::duration<float>(endTime - startTime).count();
+
+    // Print search results count
+    responseString += "<div class=\"results-stats\">Aproximadamente " + to_string(results.size()) +
+                      " resultados (" + to_string(searchTime) + " segundos)</div>";
+
+    responseString += "<div class=\"results\">";
+
+    for (auto& result : results) {
+        string path = result.first;
+        string precomputedSnippet = result.second;
+
+        // Extract display name from path
+        size_t lastSlash = path.find_last_of('/');
+        string displayName = (lastSlash != string::npos) ? path.substr(lastSlash + 1) : path;
+
+        // Remove extension
+        size_t lastDot = displayName.find_last_of('.');
+        if (lastDot != string::npos) {
+            displayName = displayName.substr(0, lastDot);
+        }
+
+        // Clean title for display
+        string cleanedTitle = cleanTitle(displayName);
+
+        // Use precomputed snippet if available
+        string snippet;
+        if (!precomputedSnippet.empty()) {
+            snippet = precomputedSnippet;
+        } else {
+            filesystem::path fullPath = filesystem::path(homePath) / path.substr(1);
+            snippet = generateSnippet(fullPath.string());
+            if (snippet.empty()) {
+                snippet = "Información sobre " + cleanedTitle + ".";
             }
         }
 
-        responseString += R"(
+        // Clean URL for display
+        string displayUrl = cleanUrl(path);
+
+        // Build result HTML based on mode
+        if (imagemode) {
+            // IMAGE MODE
+            string encodedPath = urlEncode(path);
+            responseString += "<div class=\"result image-result\">";
+            responseString += "<div class=\"image-thumbnail\">";
+            responseString += "<a href=\"" + path + "?view=1\"><img src=\"" + encodedPath +
+                              "\" alt=\"" + cleanedTitle + "\"></a>";
+            responseString += "</div>";
+            responseString += "<div class=\"image-details\">";
+            responseString += "<div class=\"url\">" + displayUrl + "</div>";
+            responseString +=
+                "<a class=\"title\" href=\"" + path + "?view=1\">" + cleanedTitle + "</a>";
+            responseString += "<div class=\"snippet\">" + snippet + "</div>";
+            responseString += "</div>";
+            responseString += "</div>";
+        } else {
+            // HTML MODE
+            responseString += "<div class=\"result\">";
+            responseString += "<div class=\"url\">" + displayUrl + "</div>";
+            responseString += "<a class=\"title\" href=\"" + path + "\">" + cleanedTitle + "</a>";
+            responseString += "<div class=\"snippet\">" + snippet + "</div>";
+            responseString += "</div>";
+        }
+    }
+
+    responseString += R"(
         </div>
     </main>
 
@@ -1357,10 +1355,45 @@ bool HttpRequestHandler::handleRequest(string url,
 </html>
 )";
 
-        response.assign(responseString.begin(), responseString.end());
-        return true;
+    response.assign(responseString.begin(), responseString.end());
+    return true;
+}
+
+bool HttpRequestHandler::handleRequest(string url,
+                                       HttpArguments arguments,
+                                       vector<char>& response) {
+    //=============== LUCKY HANDLER (FAST VERSION) ===============//
+    string luckyPage = "/lucky";
+    if (url == luckyPage) {
+        return HttpRequestHandler::luckyHandler(response);
     }
-    else
+
+    //=============== PREDICT HANDLER ===============//
+    string predictPage = "/predict";
+    if (url.substr(0, predictPage.size()) == predictPage) {
+        return predictHandler(response, arguments);
+    }
+
+    //=============== HOME PAGE HANDLER ===============//
+    string homePage = "/";
+    if (url == homePage) {
+        return homePageHandler(response);
+    }
+
+    //=============== IMAGE VIEWER HANDLER ===============//
+    string specialPage = "/special/";
+    if (url.substr(0, specialPage.size()) == specialPage &&
+        (url.find(".png") != string::npos || url.find(".jpg") != string::npos ||
+         url.find(".jpeg") != string::npos || url.find(".PNG") != string::npos ||
+         url.find(".JPG") != string::npos || url.find(".JPEG") != string::npos)) {
+        return imageHandler(response, arguments, url);
+    }
+
+    //=============== SEARCH HANDLER ===============//
+    string searchPage = "/search";
+    if (url.substr(0, searchPage.size()) == searchPage) {
+    return searchHandler(response, arguments);
+    } else
         return serve(url, response);
 
     return false;

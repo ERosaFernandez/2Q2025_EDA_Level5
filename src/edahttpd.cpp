@@ -17,16 +17,32 @@
 
 using namespace std;
 
-void printHelp() {
-    cout << "Usage: edahttpd -h WWW_PATH [-p PORT] [-m MODE]" << endl;
-    cout << "  -h WWW_PATH : Path to www folder" << endl;
-    cout << "  -p PORT     : Server port (default: 8000)" << endl;
-    cout << "  -m MODE     : Search mode ('image' or 'images' for image search, default: HTML mode)"
+bool printHelp() {
+    cout << "/==========================================================================/" << endl
+         << "Parameters:" << endl
+         << "-mode (image / html): mandatory," << endl
+         << "defines which mode will be used." << endl
+         << "-port (number): optional," << endl
+         << "specifies port to run the server on. Defaults to 8000." << endl
+         << "-path (insertYourFolderRelativePath): mandatory," << endl
+         << "specifies relative path to the www folder." << endl
          << endl;
+
+    cout << "example for Linux:" << endl
+         << "./edahttpd -port 9000 -mode html -path ../www/" << endl
+         << "example for Windows:" << endl
+         << "edahttpd.exe -mode image -path ../../../../www" << endl
+         << "example for macOS: install Linux" << endl
+         << "/==========================================================================/" << endl;
+
+    return 1;
 }
 
 int main(int argc, const char* argv[]) {
     CommandLineParser parser(argc, argv);
+
+    if (parser.hasOption("-help"))
+        return printHelp();
 
     // Configuration
     int port = 8000;
@@ -34,27 +50,27 @@ int main(int argc, const char* argv[]) {
     bool imageMode = false;
 
     // Parse command line
-    if (!parser.hasOption("-h")) {
-        cout << "error: WWW_PATH must be specified." << endl;
-
-        printHelp();
-
-        return 1;
+    if (!parser.hasOption("-path")) {
+        cout << "error: the www folder path must be specified!" << endl;
+        return printHelp();
+    } else {
+        wwwPath = parser.getOption("-path");
     }
 
-    wwwPath = parser.getOption("-h");
-
-    if (parser.hasOption("-p"))
-        port = stoi(parser.getOption("-p"));
+    if (parser.hasOption("-port"))
+        port = stoi(parser.getOption("-port"));
 
     // Detects mode
-    if (parser.hasOption("-m")) {
-        string mode = parser.getOption("-m");
-        if (mode == "image" || mode == "images") {
+    if (parser.hasOption("-mode")) {
+        string mode = parser.getOption("-mode");
+        if (mode == "image") {
             imageMode = true;
             cout << "Starting in IMAGE mode" << endl;
-        } else
+        } else if (mode == "html")
             cout << "Starting in HTML mode" << endl;
+    } else {
+        cout << "a valid mode must be specified!" << endl;
+        return printHelp();
     }
 
     // Start server

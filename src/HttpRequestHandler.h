@@ -16,15 +16,21 @@
 #include "trie.h"
 
 class HttpRequestHandler {
-public:
+  public:
     HttpRequestHandler(std::string homePath, bool imagemode = 0);
     ~HttpRequestHandler();
 
     bool handleRequest(std::string url, HttpArguments arguments, std::vector<char>& response);
 
-private:
+  private:
     bool serve(std::string path, std::vector<char>& response);
     bool loadVocabularyIntoTrie();
+
+    bool luckyHandler(std::vector<char>& response);
+    bool predictHandler(std::vector<char>& response, HttpArguments& arguments);
+    bool homePageHandler(std::vector<char>& response);
+    bool imageHandler(std::vector<char>& response, HttpArguments& arguments, std::string& url);
+    bool searchHandler(std::vector<char>& response, HttpArguments& arguments);
 
     std::string homePath;
     sqlite3* database;
