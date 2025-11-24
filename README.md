@@ -5,6 +5,8 @@ Ejecución en linux:
 ./mkindex -w ../www/
 ./mkindex -s ../www/special/
 
+ejecutar mkindex como ./mkindex -help (o mkindex.exe -help) para toda la info
+
 Ejecución en Windows:
 ./edahttpd.exe -h ../../../../www/
 

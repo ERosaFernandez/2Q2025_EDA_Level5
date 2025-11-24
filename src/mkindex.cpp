@@ -11,6 +11,7 @@
 #include <unicode/uchar.h>
 #include <unicode/ustring.h>
 
+#include <codecvt>
 #include <filesystem>
 #include <fstream>
 #include <iostream>
@@ -19,9 +20,35 @@
 #include <string>
 
 #include "CommandLineParser.h"
-#include <codecvt>
 
 using namespace std;
+
+/**
+ * @name helpMessage
+ * @brief Sends a message through terminal for guidance
+ */
+bool helpMessage() {
+    cout << "/==========================================================================/" << endl
+         << "Parameters:" << endl
+         << "-mode (image / html): mandatory," << endl
+         << "defines which and how the files are indexed." << endl
+         << "-append (index / vocab / both): optional," << endl
+         << "defines whether to remove or add new entries to the old databases." << endl
+         << "-skipvocab (no argument): optional," << endl
+         << "specifies whether to skip or not the vocabulary generation for the database." << endl
+         << "-path (insertYourFolderRelativePath): mandatory," << endl
+         << "specifies relative path for files to be indexed." << endl
+         << endl;
+
+    cout << "example for Linux:" << endl
+         << "./mkindex -mode image -skipvocab -path ../www/special/" << endl
+         << "example for Windows:" << endl
+         << "mkindex.exe -mode html -append both -path ../../../../www" << endl
+         << "example for macOS: install Linux" << endl
+         << "/==========================================================================/" << endl;
+
+    return 0;
+}
 
 static int onDatabaseEntry(void* userdata, int argc, char** argv, char** azColName) {
     cout << "--- Entry" << endl;
@@ -166,321 +193,367 @@ size_t vocabulary(const string& cleanContent,
     return vocabSet.size();
 }
 
+bool setupDatabase(const char* databaseFile,
+                   sqlite3*& database,
+                   const char* tableName,
+                   char*& databaseErrorMessage,
+                   bool append,
+                   bool vocabulary,
+                   sqlite3_stmt*& stmt) {
+    cout << "Starting Indexing..." << endl;
+
+    // Open database file
+    cout << "Opening database..." << endl;
+    if (sqlite3_open(databaseFile, &database) != SQLITE_OK) {
+        cout << "Can't open database: " << sqlite3_errmsg(database) << endl;
+
+        return 1;
+    }
+
+    // Create FTS5 virtual table
+    cout << "Creating FTS5 virtual table: " << tableName << "..." << endl;
+
+    // Drop old table if not appending
+    if (!append) {
+        string dropTableSQL = string("DROP TABLE IF EXISTS ") + tableName + ";";
+        if (sqlite3_exec(database, dropTableSQL.c_str(), NULL, 0, &databaseErrorMessage) ==
+            SQLITE_OK) {
+            cout << "Dropping table" << endl;
+            // Continue anyway - table might not exist
+        }
+    }
+
+    string createTableSQL;
+
+    if (!vocabulary) {
+        createTableSQL = string("CREATE VIRTUAL TABLE IF NOT EXISTS ") + tableName +
+                         " USING fts5("
+                         "path UNINDEXED,"
+                         "title,"
+                         "content,"
+                         "snippet UNINDEXED);";
+    } else {
+        createTableSQL = string("CREATE VIRTUAL TABLE IF NOT EXISTS ") + tableName +
+                         " USING fts5("
+                         "vocabulary);";
+    }
+
+    if (sqlite3_exec(database, createTableSQL.c_str(), NULL, 0, &databaseErrorMessage) !=
+        SQLITE_OK) {
+        cout << "Error: " << sqlite3_errmsg(database) << endl;
+        sqlite3_close(database);
+        return 1;
+    }
+
+    // Begin transaction
+    cout << "Starting transaction..." << endl;
+    sqlite3_exec(database, "BEGIN TRANSACTION;", NULL, 0, NULL);
+
+    // Prepare SQL statement
+    cout << "Preparing SQL statement..." << endl;
+    string insertSQL;
+
+    if (!vocabulary) {
+        insertSQL = string("INSERT INTO ") + tableName +
+                    " (path, title, content, snippet) VALUES (?, ?, ?, ?);";
+    } else {
+        insertSQL = string("INSERT INTO ") + tableName + " (vocabulary) VALUES (?);";
+    }
+
+    if (sqlite3_prepare_v2(database, insertSQL.c_str(), -1, &stmt, NULL) != SQLITE_OK) {
+        cout << "Error preparing statement: " << sqlite3_errmsg(database) << endl;
+        sqlite3_close(database);
+        return 1;
+    }
+    return 0;
+}
+
+bool finalizeDatabase(sqlite3_stmt*& stmt,
+                      sqlite3*& database,
+                      char*& databaseErrorMessage,
+                      const char* databaseFile,
+                      int processedFiles) {
+    // Clears statement
+    sqlite3_finalize(stmt);
+
+    // Commits transaction
+    cout << "Committing transaction..." << endl;
+    if (sqlite3_exec(database, "COMMIT;", NULL, 0, &databaseErrorMessage) != SQLITE_OK) {
+        cout << "Error committing transaction: " << sqlite3_errmsg(database) << endl;
+        return 1;
+    } else if (processedFiles == -1) {
+        // Special case for vocabulary
+        cout << "Successfully implemented vocabulary file" << databaseFile << endl;
+    } else {
+        cout << "Successfully indexed " << processedFiles << " files." << endl;
+    }
+
+    // Close database
+    cout << "Closing database..." << endl;
+    sqlite3_close(database);
+
+    return 0;
+}
+
+bool indexDatabase(const string& inputFolder,
+                   const char* databaseFile,
+                   set<string>& vocabSet,
+                   bool append) {
+    // Set up variables
+    sqlite3* database;
+    char* databaseErrorMessage = nullptr;
+    const char* tableName = "webpage_index";
+    std::wstring_convert<std::codecvt_utf8<char32_t>, char32_t> converter;
+    int processedFiles = 0;
+    sqlite3_stmt* stmt;
+
+    if (setupDatabase(databaseFile, database, tableName, databaseErrorMessage, append, 0, stmt) !=
+        0) {
+        return 1;
+    }
+
+    // Iterate through files in the specified folder
+    cout << "Indexing HTML files from folder: " << inputFolder << endl;
+
+    for (const auto& entry : filesystem::recursive_directory_iterator(inputFolder)) {
+        // Only process .html files
+        if (entry.is_regular_file() && entry.path().extension() == ".html") {
+            cout << "Processing: " << entry.path().filename().string() << endl;
+
+            // Reads file content
+            ifstream fileStream(entry.path());
+            if (fileStream.fail()) {
+                cout << "  Error opening file, skipping..." << endl;
+                continue;
+            }
+
+            string htmlContent((istreambuf_iterator<char>(fileStream)),
+                               istreambuf_iterator<char>());
+            fileStream.close();
+
+            // Extract title
+            string title = "No Title";
+            size_t titleStart = htmlContent.find("<title>");
+            size_t titleEnd = htmlContent.find("</title>");
+
+            if (titleStart != string::npos && titleEnd != string::npos && titleEnd > titleStart) {
+                title = htmlContent.substr(titleStart + 7, titleEnd - (titleStart + 7));
+            }
+
+            // Parse HTML content to plain text
+            string cleanContent = removeHTMLTags(htmlContent);
+
+            // Generate snippet from clean content (first 25 words)
+            string snippet = generateSnippetFromCleanText(cleanContent, 60);
+
+            // Sets relative path
+            string relativePath = "/wiki/" + entry.path().filename().string();
+
+            // Generates vocabulary
+            cout << "  Successfully extracted vocabulary. "
+                 << "Vocabulary size: " << vocabulary(cleanContent, converter, vocabSet) << endl;
+            cout << "  Generated snippet: " << snippet.substr(0, 50) << "..." << endl;
+
+            // Bind values to the prepared statement
+            sqlite3_bind_text(stmt, 1, relativePath.c_str(), -1, SQLITE_TRANSIENT);
+            sqlite3_bind_text(stmt, 2, title.c_str(), -1, SQLITE_TRANSIENT);
+            sqlite3_bind_text(stmt, 3, cleanContent.c_str(), -1, SQLITE_TRANSIENT);
+            sqlite3_bind_text(stmt, 4, snippet.c_str(), -1, SQLITE_TRANSIENT);
+
+            // Executes statement
+            if (sqlite3_step(stmt) != SQLITE_DONE) {
+                cout << "  Error inserting: " << sqlite3_errmsg(database) << endl;
+            }
+
+            // Resets for next iteration
+            sqlite3_reset(stmt);
+            sqlite3_clear_bindings(stmt);
+
+            processedFiles++;
+        }
+    }
+
+    return finalizeDatabase(stmt, database, databaseErrorMessage, databaseFile, processedFiles);
+}
+
+bool imageDatabase(const string& inputFolder,
+                   const char* databaseFile,
+                   set<string>& vocabSet,
+                   bool append) {
+    // Set up variables
+    sqlite3* database;
+    char* databaseErrorMessage = nullptr;
+    const char* tableName = "images_index";
+    std::wstring_convert<std::codecvt_utf8<char32_t>, char32_t> converter;
+    int processedFiles = 0;
+    sqlite3_stmt* stmt;
+
+    if (setupDatabase(databaseFile, database, tableName, databaseErrorMessage, append, 0, stmt) !=
+        0) {
+        return 1;
+    }
+
+    // Iterate through files in the specified folder
+    cout << "Indexing image files from folder: " << inputFolder << endl;
+
+    for (const auto& entry : filesystem::recursive_directory_iterator(inputFolder)) {
+        if (!entry.is_regular_file())
+            continue;
+
+        string extension = entry.path().extension().string();
+
+        // Filters only image files
+        if (extension != ".png" && extension != ".jpg" && extension != ".jpeg" &&
+            extension != ".PNG" && extension != ".JPG" && extension != ".JPEG")
+            continue;
+
+        cout << "Processing: " << entry.path().filename().string() << endl;
+
+        // Removes the extension, uses filename as title and content
+        string filename = entry.path().stem().string();
+        string title = filename;
+        string cleanContent = filename;
+
+        // Generate snippet for images (just the filename)
+        string snippet = "Image: " + filename;
+
+        // Sets relative path
+        string relativePath = "/special/" + entry.path().filename().string();
+
+        // Generates vocabulary
+        cout << "  Successfully extracted vocabulary. "
+             << "Vocabulary size: " << vocabulary(cleanContent, converter, vocabSet) << endl;
+
+        // Bind values to the prepared statement
+        sqlite3_bind_text(stmt, 1, relativePath.c_str(), -1, SQLITE_TRANSIENT);
+        sqlite3_bind_text(stmt, 2, title.c_str(), -1, SQLITE_TRANSIENT);
+        sqlite3_bind_text(stmt, 3, cleanContent.c_str(), -1, SQLITE_TRANSIENT);
+        sqlite3_bind_text(stmt, 4, snippet.c_str(), -1, SQLITE_TRANSIENT);
+
+        // Executes statement
+        if (sqlite3_step(stmt) != SQLITE_DONE) {
+            cout << "  Error inserting: " << sqlite3_errmsg(database) << endl;
+        }
+
+        // Resets for next iteration
+        sqlite3_reset(stmt);
+        sqlite3_clear_bindings(stmt);
+
+        processedFiles++;
+    }
+
+    return finalizeDatabase(stmt, database, databaseErrorMessage, databaseFile, processedFiles);
+}
+
+bool vocabularyDatabase(const char* databaseFile,
+                        const char* tableName,
+                        set<string>& vocabSet,
+                        bool append) {
+    cout << "Beginning Vocabulary Transaction..." << endl;
+    sqlite3* database;
+    char* databaseErrorMessage = nullptr;
+    sqlite3_stmt* stmt;
+
+    if (setupDatabase(databaseFile, database, tableName, databaseErrorMessage, append, 1, stmt) !=
+        0) {
+        return 1;
+    }
+
+    // Inserts vocabulary into database
+    string vocabString;
+    for (const auto& w : vocabSet) {
+        vocabString += w + " ";
+    }
+
+    sqlite3_bind_text(stmt, 1, vocabString.c_str(), -1, SQLITE_TRANSIENT);
+
+    // Executes statement
+    if (sqlite3_step(stmt) != SQLITE_DONE) {
+        cout << "  Error inserting: " << sqlite3_errmsg(database) << endl;
+    }
+
+    return finalizeDatabase(stmt, database, databaseErrorMessage, databaseFile, -1);
+}
+
 int main(int argc, const char* argv[]) {
     CommandLineParser parser(argc, argv);
 
-    // Parse command line
-    bool htmlMode = parser.hasOption("-w");
-    bool imageMode = parser.hasOption("-s");
-    bool skipProcess = parser.hasOption("-skip");
+    if (parser.hasOption("-help") || argc == 1)
+        return helpMessage();
 
-    string inputFolder = htmlMode ? parser.getOption("-w") : parser.getOption("-s");
+    // Parse command line
+    bool htmlMode = 1;
+    bool imageMode = 0;
+    bool appendIndex = 0;
+    bool appendVocab = 0;
+    bool skipVocab = 0;
+
+    // Toggles between HTML mode and Image mode
+    if (parser.hasOption("-mode")) {
+        if (parser.getOption("-mode") == "image") {
+            htmlMode = 0;
+            imageMode = 1;
+        } else if (parser.getOption("-mode") == "html") {
+            htmlMode = 1;
+            imageMode = 0;
+        }
+    } else {
+        cout << "error: a valid mode must be specified!" << endl;
+        return helpMessage();
+    }
+
+    // Checks path validation
+    if (!parser.hasOption("-path")) {
+        cout << "error: a valid path must be specified!" << endl;
+        return helpMessage();
+    }
+
+    // Checks whether to skip vocabulary or not
+    if (parser.hasOption("-skipvocab"))
+        skipVocab = 1;
+
+    // Checks if user wants to keep old database file
+    if (parser.hasOption("-append")) {
+        if (parser.getOption("-append") == "index")
+            appendIndex = 1;
+        else if (parser.getOption("-append") == "vocab")
+            appendVocab = 1;
+        else if (parser.getOption("-append") == "both") {
+            appendIndex = 1;
+            appendVocab = 1;
+        } else {
+            cout << "error: invalid append value!" << endl;
+            return helpMessage();
+        }
+    }
+
+    // Set up variables and constants;
+    string inputFolder = parser.getOption("-path");
     const char* databaseFile = htmlMode ? "index.db" : "images.db";
-    sqlite3* database;
     char* databaseErrorMessage;
     set<string> vocabSet;
 
-    // Toggles between HTML mode and Image mode
-    if (!htmlMode && !imageMode) {
-        cout << "error: input folder must be specified!" << endl
-             << "HTML mode: ./mkindex -w ../www/" << endl
-             << "Image mode: ./mkindex -s ../special/" << endl;
-        return 1;
-    }
+    //============================== INDEXING =============================//
 
-    if (htmlMode && imageMode) {
-        cout << "error: cannot use -w and -s at the same time!" << endl;
-        return 1;
-    }
-
-    if (skipProcess && parser.getOption("-skip") != "index" &&
-        parser.getOption("-skip") != "vocab") {
-        cout << "error: invalid skip option!" << endl;
-        return 1;
-    }
-
-    if (!skipProcess || (skipProcess && parser.getOption("-skip") != "index")) {
-        cout << "Starting Indexing..." << endl;
-
-        //============================== INDEXING =============================//
-
-        // Open database file
-        cout << "Opening database..." << endl;
-        if (sqlite3_open(databaseFile, &database) != SQLITE_OK) {
-            cout << "Can't open database: " << sqlite3_errmsg(database) << endl;
-
+    if (htmlMode) {
+        if (indexDatabase(inputFolder, databaseFile, vocabSet, appendIndex))
             return 1;
-        }
-
-        // Create FTS5 virtual table with snippet column
-        const char* tableName = imageMode ? "images_index" : "webpage_index";
-        cout << "Creating FTS5 virtual table: " << tableName << "..." << endl;
-
-        // First, drop the old table if it exists to ensure clean migration
-        string dropTableSQL = string("DROP TABLE IF EXISTS ") + tableName + ";";
-        if (sqlite3_exec(database, dropTableSQL.c_str(), NULL, 0, &databaseErrorMessage) !=
-            SQLITE_OK) {
-            cout << "Warning dropping old table: " << sqlite3_errmsg(database) << endl;
-            // Continue anyway - table might not exist
-        }
-
-        // Now create the new table with snippet column
-        string createTableSQL = string("CREATE VIRTUAL TABLE IF NOT EXISTS ") + tableName +
-                                " USING fts5("
-                                "path UNINDEXED,"
-                                "title,"
-                                "content,"
-                                "snippet UNINDEXED);";
-
-        if (sqlite3_exec(database, createTableSQL.c_str(), NULL, 0, &databaseErrorMessage) !=
-            SQLITE_OK) {
-            cout << "Error: " << sqlite3_errmsg(database) << endl;
-            sqlite3_close(database);
+    } else {
+        if (imageDatabase(inputFolder, databaseFile, vocabSet, appendIndex))
             return 1;
-        }
-
-        // Delete previous entries if table already existed (redundant after DROP but safe)
-        cout << "Ensuring table is empty..." << endl;
-        string deleteSQL = string("DELETE FROM ") + tableName + ";";
-        if (sqlite3_exec(database, deleteSQL.c_str(), NULL, 0, &databaseErrorMessage) !=
-            SQLITE_OK) {
-            cout << "Note: " << sqlite3_errmsg(database) << " (this is normal for new tables)" << endl;
-        }
-
-        // Begin transaction
-        cout << "Starting transaction..." << endl;
-        sqlite3_exec(database, "BEGIN TRANSACTION;", NULL, 0, NULL);
-
-        // Prepare SQL statement with snippet column
-        cout << "Preparing SQL statement..." << endl;
-        sqlite3_stmt* stmt;
-        string insertSQL = string("INSERT INTO ") + tableName +
-                           " (path, title, content, snippet) VALUES (?, ?, ?, ?);";
-
-        if (sqlite3_prepare_v2(database, insertSQL.c_str(), -1, &stmt, NULL) != SQLITE_OK) {
-            cout << "Error preparing statement: " << sqlite3_errmsg(database) << endl;
-            sqlite3_close(database);
-            return 1;
-        }
-
-        // Iterate through files in the specified folder
-        const char* fileType = imageMode ? "image" : "HTML";
-        cout << "Indexing " << fileType << " files from folder: " << inputFolder << endl;
-
-        std::wstring_convert<std::codecvt_utf8<char32_t>, char32_t> converter;
-
-        int processedFiles = 0;
-
-        if (htmlMode) {
-            for (const auto& entry : filesystem::recursive_directory_iterator(inputFolder)) {
-                // Only process .html files
-                if (entry.is_regular_file() && entry.path().extension() == ".html") {
-                    cout << "Processing: " << entry.path().filename().string() << endl;
-
-                    // Reads file content
-                    ifstream fileStream(entry.path());
-                    if (fileStream.fail()) {
-                        cout << "  Error opening file, skipping..." << endl;
-                        continue;
-                    }
-
-                    string htmlContent((istreambuf_iterator<char>(fileStream)),
-                                       istreambuf_iterator<char>());
-                    fileStream.close();
-
-                    // Extract title
-                    string title = "No Title";
-                    size_t titleStart = htmlContent.find("<title>");
-                    size_t titleEnd = htmlContent.find("</title>");
-
-                    if (titleStart != string::npos && titleEnd != string::npos &&
-                        titleEnd > titleStart) {
-                        title = htmlContent.substr(titleStart + 7, titleEnd - (titleStart + 7));
-                    }
-
-                    // Parse HTML content to plain text
-                    string cleanContent = removeHTMLTags(htmlContent);
-
-                    // Generate snippet from clean content (first 25 words)
-                    string snippet = generateSnippetFromCleanText(cleanContent, 60);
-
-                    // Sets relative path
-                    string relativePath = "/wiki/" + entry.path().filename().string();
-
-                    // Generates vocabulary
-                    cout << "  Successfully extracted vocabulary. "
-                         << "Vocabulary size: " << vocabulary(cleanContent, converter, vocabSet)
-                         << endl;
-                    cout << "  Generated snippet: " << snippet.substr(0, 50) << "..." << endl;
-
-                    // Bind values to the prepared statement
-                    sqlite3_bind_text(stmt, 1, relativePath.c_str(), -1, SQLITE_TRANSIENT);
-                    sqlite3_bind_text(stmt, 2, title.c_str(), -1, SQLITE_TRANSIENT);
-                    sqlite3_bind_text(stmt, 3, cleanContent.c_str(), -1, SQLITE_TRANSIENT);
-                    sqlite3_bind_text(stmt, 4, snippet.c_str(), -1, SQLITE_TRANSIENT);
-
-                    // Executes statement
-                    if (sqlite3_step(stmt) != SQLITE_DONE) {
-                        cout << "  Error inserting: " << sqlite3_errmsg(database) << endl;
-                    }
-
-                    // Resets for next iteration
-                    sqlite3_reset(stmt);
-                    sqlite3_clear_bindings(stmt);
-
-                    processedFiles++;
-                }
-            }
-        } else {
-            for (const auto& entry : filesystem::recursive_directory_iterator(inputFolder)) {
-                if (!entry.is_regular_file())
-                    continue;
-
-                string extension = entry.path().extension().string();
-
-                // Filters only image files
-                if (extension != ".png" && extension != ".jpg" && extension != ".jpeg" &&
-                    extension != ".PNG" && extension != ".JPG" && extension != ".JPEG")
-                    continue;
-
-                cout << "Processing: " << entry.path().filename().string() << endl;
-
-                // Removes the extension, uses filename as title and content
-                string filename = entry.path().stem().string();
-                string title = filename;
-                string cleanContent = filename;
-
-                // Generate snippet for images (just the filename)
-                string snippet = "Image: " + filename;
-
-                // Sets relative path
-                string relativePath = "/special/" + entry.path().filename().string();
-
-                // Generates vocabulary
-                cout << "  Successfully extracted vocabulary. "
-                     << "Vocabulary size: " << vocabulary(cleanContent, converter, vocabSet)
-                     << endl;
-
-                // Bind values to the prepared statement
-                sqlite3_bind_text(stmt, 1, relativePath.c_str(), -1, SQLITE_TRANSIENT);
-                sqlite3_bind_text(stmt, 2, title.c_str(), -1, SQLITE_TRANSIENT);
-                sqlite3_bind_text(stmt, 3, cleanContent.c_str(), -1, SQLITE_TRANSIENT);
-                sqlite3_bind_text(stmt, 4, snippet.c_str(), -1, SQLITE_TRANSIENT);
-
-                // Executes statement
-                if (sqlite3_step(stmt) != SQLITE_DONE) {
-                    cout << "  Error inserting: " << sqlite3_errmsg(database) << endl;
-                }
-
-                // Resets for next iteration
-                sqlite3_reset(stmt);
-                sqlite3_clear_bindings(stmt);
-
-                processedFiles++;
-            }
-        }
-
-        // Clears statement
-        sqlite3_finalize(stmt);
-
-        // Commits transaction
-        cout << "Committing transaction..." << endl;
-        sqlite3_exec(database, "COMMIT;", NULL, 0, NULL);
-
-        cout << "Successfully indexed " << processedFiles << " files." << endl;
-
-        // Close database
-        cout << "Closing database..." << endl;
-        sqlite3_close(database);
     }
-    if (!skipProcess || (skipProcess && parser.getOption("-skip") != "vocab")) {
+
+    if (!skipVocab) {
         cout << "Starting Vocabulary Indexing..." << endl;
 
         //============================ VOCABULARY INDEXING =============================//
 
         // Create FTS5 virtual table for vocabulary
-        cout << "Beginning Vocabulary Transaction..." << endl;
         const char* vocabularyFile = htmlMode ? "index_vocab.db" : "images_vocab.db";
-        sqlite3* database_vocab;
         char* databaseVocabErrorMessage;
         const char* tableName_vocab = imageMode ? "images_vocab" : "webpage_vocab";
-        cout << "Creating FTS5 virtual table: " << tableName_vocab << "..." << endl;
 
-        string createTableSQL_vocab = string("CREATE VIRTUAL TABLE IF NOT EXISTS ") +
-                                      tableName_vocab +
-                                      " USING fts5("
-                                      "vocabulary);";
-
-        // Open vocabulary file
-        cout << "Opening vocabulary..." << endl;
-        if (sqlite3_open(vocabularyFile, &database_vocab) != SQLITE_OK) {
-            cout << "Can't open database: " << sqlite3_errmsg(database_vocab) << endl;
-
-            return 1;
-        }
-
-        if (sqlite3_exec(database_vocab,
-                         createTableSQL_vocab.c_str(),
-                         NULL,
-                         0,
-                         &databaseVocabErrorMessage) != SQLITE_OK) {
-            cout << "Error: " << sqlite3_errmsg(database_vocab) << endl;
-            sqlite3_close(database_vocab);
-            return 1;
-        }
-
-        // Delete previous entries if table already existed
-        cout << "Deleting previous entries..." << endl;
-        string deleteSQL_vocab = string("DELETE FROM ") + tableName_vocab + ";";
-        if (sqlite3_exec(
-                database_vocab, deleteSQL_vocab.c_str(), NULL, 0, &databaseVocabErrorMessage) !=
-            SQLITE_OK) {
-            cout << "Error: " << sqlite3_errmsg(database_vocab) << endl;
-            sqlite3_close(database_vocab);
-            return 1;
-        }
-
-        // Begin transaction
-        cout << "Starting transaction..." << endl;
-        sqlite3_exec(database_vocab, "BEGIN TRANSACTION;", NULL, 0, NULL);
-
-        // Prepare SQL statement
-        cout << "Preparing SQL statement..." << endl;
-        sqlite3_stmt* stmt_vocab;
-        string insertSQL_vocab =
-            string("INSERT INTO ") + tableName_vocab + " (vocabulary) VALUES (?);";
-
-        if (sqlite3_prepare_v2(database_vocab, insertSQL_vocab.c_str(), -1, &stmt_vocab, NULL) !=
-            SQLITE_OK) {
-            cout << "Error preparing statement: " << sqlite3_errmsg(database_vocab) << endl;
-            sqlite3_close(database_vocab);
-            return 1;
-        }
-
-        // Inserts vocabulary into database
-        string vocabString;
-        for (const auto& w : vocabSet) {
-            vocabString += w + " ";
-        }
-
-        sqlite3_bind_text(stmt_vocab, 1, vocabString.c_str(), -1, SQLITE_TRANSIENT);
-
-        // Executes statement
-        if (sqlite3_step(stmt_vocab) != SQLITE_DONE) {
-            cout << "  Error inserting: " << sqlite3_errmsg(database_vocab) << endl;
-        }
-
-        // Clears statement
-        sqlite3_finalize(stmt_vocab);
-
-        // Commits transaction
-        cout << "Committing transaction..." << endl;
-        sqlite3_exec(database_vocab, "COMMIT;", NULL, 0, NULL);
-
-        cout << "Successfully implemented " << vocabularyFile << endl;
-
-        // Close database
-        cout << "Closing database..." << endl;
-        sqlite3_close(database_vocab);
+        return vocabularyDatabase(vocabularyFile, tableName_vocab, vocabSet, appendVocab);
     }
+    return 0;
 }
