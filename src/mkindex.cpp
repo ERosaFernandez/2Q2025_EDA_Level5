@@ -2,7 +2,7 @@
  * @file mkindex.cpp
  * @author Marc S. Ressl
  * @brief Makes a database index
- * @version 0.4
+ * @version 1.0
  *
  * @copyright Copyright (c) 2022-2024 Marc S. Ressl
  */
@@ -249,7 +249,7 @@ bool setupDatabase(const char* databaseFile,
         cout << "error with PRAGMA setting: " << sqlite3_errmsg(database) << endl;
         return 1;
     }
-    cout << "Succesfully loaded custom settings " << sqlite3_errmsg(database) << endl;
+    cout << "Succesfully loaded custom settings " << endl;
 
     // Create FTS5 virtual table
     cout << "Creating FTS5 virtual table: " << tableName << "..." << endl;
@@ -498,7 +498,8 @@ bool imageDatabase(const string& inputFolder,
         processedFiles++;
     }
 
-    return finalizeDatabase(stmt, database, databaseErrorMessage, databaseFile, processedFiles, tableName);
+    return finalizeDatabase(
+        stmt, database, databaseErrorMessage, databaseFile, processedFiles, tableName);
 }
 
 bool vocabularyDatabase(const char* databaseFile,

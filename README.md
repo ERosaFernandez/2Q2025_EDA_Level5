@@ -43,24 +43,36 @@ desde el navegador.
 -   **Visor de imágenes integrado:**\
     Accesible con `?view=1`, mostrando título, URL limpia y la imagen.
 
+## Observación / Aclaración
+    Para ejecutar ambos programas es necesario instalar ICU, vital
+    para procesado de simbolos UNICODE. Instalación con vcpkg:
+
+    vcpkg install ICU
+
 ## Ejemplos de uso
 
 ### Linux
 
 HTML:
 
-    ./mkindex -mode html -path ../www/wiki/
+    ./mkindex -mode html -path ../www/
+    ./edahttpd -mode html -path ../www/
 
 Imágenes:
 
     ./mkindex -mode image -path ../www/special/
+    ./edahttpd -mode image -path ../www/
 
 ### Windows (CMD o PowerShell)
 
 HTML:
 
-    mkindex.exe -mode html -path ..\..\..\..\www\wiki\
+    mkindex.exe -mode html -path ..\..\..\..\www\
+    edahttpd.exe -mode html -path ..\..\..\..\www\
 
 Imágenes:
 
     mkindex.exe -mode image -path ..\..\..\..\www\special\
+    edahttpd.exe -mode image -path ..\..\..\..\www\
+
+*una vez corriendo, el servidor se cierra apretando cualquier tecla + enter*

@@ -1,7 +1,7 @@
 /**
  * @file trie.h
  * @brief Browser extension for fast in-memory prefix searching
- *
+ * @version 1.0
  */
 
 #ifndef TRIE_H
@@ -10,8 +10,8 @@
 #include <codecvt>
 #include <locale>
 #include <map>
-#include <vector>
 #include <string>
+#include <vector>
 
 /**
  * @class TrieNode
@@ -19,7 +19,6 @@
  */
 class TrieNode {
   public:
-
     TrieNode() : isEndOfWord(false) {
     }
     ~TrieNode() {

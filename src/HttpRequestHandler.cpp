@@ -2,7 +2,7 @@
  * @file HttpRequestHandler.cpp
  * @author Marc S. Ressl
  * @brief EDAoggle search engine
- * @version 0.5
+ * @version 1.0
  *
  * @copyright Copyright (c) 2022-2024 Marc S. Ressl
  */

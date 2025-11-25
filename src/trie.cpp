@@ -1,3 +1,9 @@
+/**
+ * @file trie.h
+ * @brief Browser extension for fast in-memory prefix searching
+ * @version 1.0
+ */
+
 #include "trie.h"
 
 #include <unicode/uchar.h>

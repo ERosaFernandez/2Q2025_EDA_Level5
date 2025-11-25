@@ -2,7 +2,7 @@
  * @file edahttpd.cpp
  * @author Marc S. Ressl
  * @brief Manages the edahttpd server
- * @version 0.3
+ * @version 1.0
  *
  * @copyright Copyright (c) 2022-2024 Marc S. Ressl
  */

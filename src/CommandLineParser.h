@@ -13,15 +13,14 @@
 #include <string>
 #include <vector>
 
-class CommandLineParser
-{
-public:
-    CommandLineParser(int argc, const char *argv[]);
+class CommandLineParser {
+  public:
+    CommandLineParser(int argc, const char* argv[]);
 
-    bool hasOption(const std::string &option);
-    std::string getOption(const std::string &option);
+    bool hasOption(const std::string& option);
+    std::string getOption(const std::string& option);
 
-private:
+  private:
     std::vector<std::string> arguments;
 };
 

@@ -2,7 +2,7 @@
  * @file HttpServer.cpp
  * @author Marc S. Ressl
  * @brief Simple interface to libmicrohttpd
- * @version 0.3
+ * @version 0.5
  *
  * @copyright Copyright (c) 2022-2024 Marc S. Ressl
  */

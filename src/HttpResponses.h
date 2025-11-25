@@ -1,10 +1,8 @@
 ﻿/**
- * @file HttpRequestHandler.h
- * @author Marc S. Ressl
- * @brief EDAoggle search engine
- * @version 0.5
+ * @file HttpResponses.h
+ * @brief EDAoggle search engine webpage responses
+ * @version 1.0
  *
- * @copyright Copyright (c) 2022-2024 Marc S. Ressl
  */
 
 #ifndef HTTPRESPONSES_H
@@ -16,11 +14,10 @@
 #include <string>
 
 namespace Responses {
-	using namespace std;
+    using namespace std;
 
-
-	inline string homePageResponse() {
-		return string(
+    inline string homePageResponse() {
+        return string(
             "<!DOCTYPE html>\
             <html>\
             <head>\
@@ -135,18 +132,21 @@ namespace Responses {
                 </article>\
             </body>\
             </html>");
-	}
+    }
 
-    inline string imagePageResponse(string cleanedTitle, string encodedImageUrl, string filename, string cleanUrlStr) {
+    inline string imagePageResponse(string cleanedTitle,
+                                    string encodedImageUrl,
+                                    string filename,
+                                    string cleanUrlStr) {
         return string(
-            "<!DOCTYPE html>\
+                   "<!DOCTYPE html>\
         <html>\
         <head>\
             <meta charset=\"utf-8\" />\
             <title>") +
-            cleanedTitle +
-            string(
-                " - EDAoogle</title>\
+               cleanedTitle +
+               string(
+                   " - EDAoogle</title>\
             <link rel=\"preload\" href=\"https://fonts.googleapis.com\" />\
             <link rel=\"preload\" href=\"https://fonts.gstatic.com\" crossorigin />\
             <link href=\"https://fonts.googleapis.com/css2?family=Inter:wght@400;600&display=swap\" rel=\"stylesheet\" />\
@@ -255,10 +255,16 @@ namespace Responses {
             <div class=\"image-viewer\">\
                 <div class=\"image-header\">\
                     <a href=\"/\" class=\"back-link\">Volver a EDAoogle</a>\
-                    <h1 class=\"image-title\">") + cleanedTitle + string("</h1>\
+                    <h1 class=\"image-title\">") +
+               cleanedTitle +
+               string(
+                   "</h1>\
                 </div>\
                 <div class=\"image-main\" role=\"region\" aria-label=\"Vista de imagen\">\
-                    <img src=\"") + encodedImageUrl + string("\" alt=\"") + cleanedTitle + string(" - Imagen detallada\" loading=\"lazy\">\
+                    <img src=\"") +
+               encodedImageUrl + string("\" alt=\"") + cleanedTitle +
+               string(
+                   " - Imagen detallada\" loading=\"lazy\">\
                     <div class=\"zoom-controls\">\
                         <button class=\"zoom-btn\" onclick=\"zoomIn()\">+</button>\
                         <button class=\"zoom-btn\" onclick=\"zoomOut()\">-</button>\
@@ -266,8 +272,14 @@ namespace Responses {
                     </div>\
                 </div>\
                 <div class=\"image-details\">\
-                    <div class=\"detail-item\"><span class=\"detail-label\">Nombre del archivo:</span> ") + filename + string("</div>\
-                    <div class=\"detail-item\"><span class=\"detail-label\">Ubicacion:</span> ") + cleanUrlStr + string("</div>\
+                    <div class=\"detail-item\"><span class=\"detail-label\">Nombre del archivo:</span> ") +
+               filename +
+               string(
+                   "</div>\
+                    <div class=\"detail-item\"><span class=\"detail-label\">Ubicacion:</span> ") +
+               cleanUrlStr +
+               string(
+                   "</div>\
                 </div>\
             </div>\
             <script>\
@@ -627,7 +639,8 @@ namespace Responses {
                     <form action="/search" method="get">
                         <div class="search-container">
                             <div class="search-input-wrapper">
-                                <input type="text" name="q" value=")" + searchString + R"(" autocomplete="off" autofocus>
+                                <input type="text" name="q" value=")" +
+               searchString + R"(" autocomplete="off" autofocus>
                                 <button type="submit">Buscar</button>
                             </div>
                         </div>
@@ -730,6 +743,6 @@ namespace Responses {
         </html>
     )";
     }
-}
+}  // namespace Responses
 
 #endif
