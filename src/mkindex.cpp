@@ -210,6 +210,47 @@ bool setupDatabase(const char* databaseFile,
         return 1;
     }
 
+    // Additional settings and extensions
+
+    if (sqlite3_exec(database, "PRAGMA secure_delete = OFF;", nullptr, 0, &databaseErrorMessage) !=
+        SQLITE_OK) {
+        cout << "error with PRAGMA setting: " << sqlite3_errmsg(database) << endl;
+        return 1;
+    }
+    if (sqlite3_exec(
+            database, "PRAGMA locking_mode = EXCLUSIVE;", nullptr, 0, &databaseErrorMessage) !=
+        SQLITE_OK) {
+        cout << "error with PRAGMA setting: " << sqlite3_errmsg(database) << endl;
+        return 1;
+    }
+    if (sqlite3_exec(database, "PRAGMA cache_size = -524288;", nullptr, 0, &databaseErrorMessage) !=
+        SQLITE_OK) {
+        cout << "error with PRAGMA setting: " << sqlite3_errmsg(database) << endl;
+        return 1;
+    }
+    if (sqlite3_exec(database, "PRAGMA temp_store = MEMORY;", nullptr, 0, &databaseErrorMessage) !=
+        SQLITE_OK) {
+        cout << "error with PRAGMA setting: " << sqlite3_errmsg(database) << endl;
+        return 1;
+    }
+    if (sqlite3_exec(
+            database, "PRAGMA mmap_size = 1073741824;", nullptr, 0, &databaseErrorMessage) !=
+        SQLITE_OK) {
+        cout << "error with PRAGMA setting: " << sqlite3_errmsg(database) << endl;
+        return 1;
+    }
+    if (sqlite3_exec(database, "PRAGMA journal_mode = WAL;", nullptr, 0, &databaseErrorMessage) !=
+        SQLITE_OK) {
+        cout << "error with PRAGMA setting: " << sqlite3_errmsg(database) << endl;
+        return 1;
+    }
+    if (sqlite3_exec(database, "PRAGMA synchronous = OFF;", nullptr, 0, &databaseErrorMessage) !=
+        SQLITE_OK) {
+        cout << "error with PRAGMA setting: " << sqlite3_errmsg(database) << endl;
+        return 1;
+    }
+    cout << "Succesfully loaded custom settings " << sqlite3_errmsg(database) << endl;
+
     // Create FTS5 virtual table
     cout << "Creating FTS5 virtual table: " << tableName << "..." << endl;
 
@@ -231,7 +272,9 @@ bool setupDatabase(const char* databaseFile,
                          "path UNINDEXED,"
                          "title,"
                          "content,"
-                         "snippet UNINDEXED);";
+                         "snippet UNINDEXED,"
+                         "detail = none,"
+                         "tokenize = 'unicode61 remove_diacritics 2');";
     } else {
         createTableSQL = string("CREATE VIRTUAL TABLE IF NOT EXISTS ") + tableName +
                          " USING fts5("
@@ -272,7 +315,8 @@ bool finalizeDatabase(sqlite3_stmt*& stmt,
                       sqlite3*& database,
                       char*& databaseErrorMessage,
                       const char* databaseFile,
-                      int processedFiles) {
+                      int processedFiles,
+                      const char* tableName) {
     // Clears statement
     sqlite3_finalize(stmt);
 
@@ -286,6 +330,17 @@ bool finalizeDatabase(sqlite3_stmt*& stmt,
         cout << "Successfully implemented vocabulary file" << databaseFile << endl;
     } else {
         cout << "Successfully indexed " << processedFiles << " files." << endl;
+
+        // Optimizes index table
+        string optimizeString =
+            string("INSERT INTO ") + tableName + " (" + tableName + ") VALUES ('optimize');";
+
+        if (sqlite3_exec(database, optimizeString.c_str(), NULL, 0, &databaseErrorMessage) !=
+            SQLITE_OK) {
+            cout << "Error optimizing: " << sqlite3_errmsg(database) << endl;
+            return 1;
+        }
+        cout << "Successfully optimized index " << endl;
     }
 
     // Close database
@@ -373,7 +428,8 @@ bool indexDatabase(const string& inputFolder,
         }
     }
 
-    return finalizeDatabase(stmt, database, databaseErrorMessage, databaseFile, processedFiles);
+    return finalizeDatabase(
+        stmt, database, databaseErrorMessage, databaseFile, processedFiles, tableName);
 }
 
 bool imageDatabase(const string& inputFolder,
@@ -442,7 +498,7 @@ bool imageDatabase(const string& inputFolder,
         processedFiles++;
     }
 
-    return finalizeDatabase(stmt, database, databaseErrorMessage, databaseFile, processedFiles);
+    return finalizeDatabase(stmt, database, databaseErrorMessage, databaseFile, processedFiles, tableName);
 }
 
 bool vocabularyDatabase(const char* databaseFile,
@@ -472,7 +528,7 @@ bool vocabularyDatabase(const char* databaseFile,
         cout << "  Error inserting: " << sqlite3_errmsg(database) << endl;
     }
 
-    return finalizeDatabase(stmt, database, databaseErrorMessage, databaseFile, -1);
+    return finalizeDatabase(stmt, database, databaseErrorMessage, databaseFile, -1, tableName);
 }
 
 int main(int argc, const char* argv[]) {

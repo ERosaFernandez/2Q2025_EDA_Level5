@@ -8,7 +8,6 @@
  */
 
 #include "HttpRequestHandler.h"
-#include "HttpResponses.h"
 
 #include <unicode/uchar.h>
 #include <unicode/ustring.h>
@@ -22,6 +21,8 @@
 #include <locale>
 #include <regex>
 #include <sstream>
+
+#include "HttpResponses.h"
 
 using namespace std;
 
@@ -41,6 +42,33 @@ HttpRequestHandler::HttpRequestHandler(string homePath, bool imageMode) {
         cout << "Database opened successfully: " << dbFile << endl;
         cout << "Search mode: " << (imageMode ? "IMAGES" : "HTML") << endl;
     }
+
+    // Additional settings
+    if (sqlite3_exec(database, "PRAGMA journal_mode = OFF;", nullptr, nullptr, nullptr) !=
+        SQLITE_OK)
+        cout << "Error: " << sqlite3_errmsg(database) << endl;
+    if (sqlite3_exec(database, "PRAGMA synchronous = OFF;", nullptr, nullptr, nullptr) != SQLITE_OK)
+        cout << "Error: " << sqlite3_errmsg(database) << endl;
+    if (sqlite3_exec(database, "PRAGMA locking_mode = EXCLUSIVE;", nullptr, nullptr, nullptr) !=
+        SQLITE_OK)
+        cout << "Error: " << sqlite3_errmsg(database) << endl;
+    if (sqlite3_exec(database, "PRAGMA mmap_size = 5000000000;", nullptr, nullptr, nullptr) !=
+        SQLITE_OK)
+        cout << "Error: " << sqlite3_errmsg(database) << endl;
+    if (sqlite3_exec(database, "PRAGMA cache_size = -500000;", nullptr, nullptr, nullptr) !=
+        SQLITE_OK)
+        cout << "Error: " << sqlite3_errmsg(database) << endl;
+    if (sqlite3_exec(database, "PRAGMA temp_store = MEMORY;", nullptr, nullptr, nullptr) !=
+        SQLITE_OK)
+        cout << "Error: " << sqlite3_errmsg(database) << endl;
+    if (sqlite3_exec(database, "PRAGMA secure_delete = OFF;", nullptr, nullptr, nullptr) !=
+        SQLITE_OK)
+        cout << "Error: " << sqlite3_errmsg(database) << endl;
+    if (sqlite3_exec(database, "PRAGMA wal_autocheckpoint = 0;", nullptr, nullptr, nullptr) !=
+        SQLITE_OK)
+        cout << "Error: " << sqlite3_errmsg(database) << endl;
+
+    cout << "Succesfuly loaded custom settings" << endl;
 
     // Loads vocabulary into Trie
     cout << "Loading vocabulary into Trie..." << endl;
@@ -458,7 +486,7 @@ bool HttpRequestHandler::predictHandler(std::vector<char>& response, HttpArgumen
 
 bool HttpRequestHandler::homePageHandler(std::vector<char>& response) {
     // Serves the home page with autocomplete functionality
-	string responseString = Responses::homePageResponse();
+    string responseString = Responses::homePageResponse();
 
     response.assign(responseString.begin(), responseString.end());
     return true;
@@ -494,8 +522,8 @@ bool HttpRequestHandler::imageHandler(std::vector<char>& response,
         string encodedImageUrl = urlEncode(cleanUrlStr);
 
         // Build image viewer page
-		string responseString = Responses::imagePageResponse(
-			cleanedTitle, encodedImageUrl, filename, cleanUrlStr);
+        string responseString =
+            Responses::imagePageResponse(cleanedTitle, encodedImageUrl, filename, cleanUrlStr);
 
         response.assign(responseString.begin(), responseString.end());
         return true;
@@ -509,7 +537,7 @@ bool HttpRequestHandler::searchHandler(std::vector<char>& response, HttpArgument
         searchString = arguments["q"];
 
     // HTML Header with autocomplete and enhanced styling
-	string responseString = Responses::searchPageStart(searchString);
+    string responseString = Responses::searchPageStart(searchString);
 
     // Start timer
     auto startTime = chrono::high_resolution_clock::now();
