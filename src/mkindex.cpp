@@ -44,7 +44,6 @@ bool helpMessage() {
          << "./mkindex -mode image -skipvocab -path ../www/special/" << endl
          << "example for Windows:" << endl
          << "mkindex.exe -mode html -append both -path ../../../../www" << endl
-         << "example for macOS: install Linux" << endl
          << "/==========================================================================/" << endl;
 
     return 0;

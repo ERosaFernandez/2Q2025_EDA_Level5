@@ -32,7 +32,6 @@ bool printHelp() {
          << "./edahttpd -port 9000 -mode html -path ../www/" << endl
          << "example for Windows:" << endl
          << "edahttpd.exe -mode image -path ../../../../www" << endl
-         << "example for macOS: install Linux" << endl
          << "/==========================================================================/" << endl;
 
     return 1;
